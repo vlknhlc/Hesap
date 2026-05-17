@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bütçe Cloud - Çok Kullanıcılı Sistem</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
+        body { background-color: #f4f6f9; padding: 10px; color: #333; }
+        
+        /* Giriş ve Kayıt Paneli */
+        #login-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #2c3e50; display: flex; align-items: center; justify-content: center; z-index: 1000;
+        }
+        .login-card {
+            background: white; padding: 30px; border-radius: 12px; width: 90%; max-width: 400px; text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        }
+        .login-card input {
+            width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 6px; font-size: 16px;
+        }
+        
+        #app-content { display: none; max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+
+        .grid-table { display: grid; grid-template-columns: 2fr 1fr 1.5fr 0.8fr; gap: 1px; background: #e0e0e0; margin-bottom: 15px; border: 1px solid #e0e0e0; }
+        .grid-header { background: #34495e; color: white; padding: 12px 8px; font-weight: bold; text-align: center; font-size: 14px; }
+        .grid-cell { background: white; padding: 6px; display: flex; align-items: center; justify-content: center; }
+        
+        input[type="text"], input[type="number"], input[type="date"] { width: 100%; border: 1px solid #eee; padding: 8px; border-radius: 4px; outline: none; }
+        input:focus { border-color: #3498db; }
+        input[type="checkbox"] { width: 20px; height: 20px; cursor: pointer; }
+        
+        .btn { background: #2ecc71; color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; width: 100%; margin-bottom: 10px; font-size: 16px; font-weight: bold; }
+        .btn:hover { background: #27ae60; }
+        
+        .summary-box { background: #ecf0f1; padding: 15px; border-radius: 8px; margin-bottom: 25px; }
+        .summary-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #bdc3c7; }
+        .summary-row:last-child { border: none; }
+    </style>
+
+    <!-- FIREBASE KÜTÜPHANELERİ -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+
+<!-- GİRİŞ VE KAYIT EKRANI -->
+<div id="login-screen">
+    <div class="login-card">
+        <h2 id="auth-title">Bütçe Cloud Giriş</h2>
+        <p id="auth-desc" style="font-size: 13px; color: #7f8c8d; margin-bottom: 10px;">Hesabınız yoksa kayıt olabilirsiniz.</p>
+        
+        <input type="text" id="username" placeholder="Kullanıcı Adı">
+        <input type="password" id="password" placeholder="Şifre">
+        
+        <button class="btn" id="main-auth-btn" onclick="login()">Giriş Yap</button>
+        <button class="btn" id="toggle-auth-btn" onclick="toggleAuthMode()" style="background: #34495e; font-size: 13px; padding: 6px;">Hesabın Yok mu? Kayıt Ol</button>
+        
+        <p id="login-error" style="color: #e74c3c; display: none; font-size: 14px; font-weight: bold; margin-top: 10px;"></p>
+    </div>
+</div>
+
+<!-- ANA UYGULAMA -->
+<div id="app-content">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <div>
+            <h2>Giderler</h2>
+            <span style="font-size: 13px; color: #7f8c8d;">Aktif Hesap: <b id="display-user" style="color: #3498db;">-</b></span>
+        </div>
+        <button onclick="logout()" style="background: #e74c3c; border: none; color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold;">Güvenli Çıkış</button>
+    </div>
+    
+    <div class="grid-table" id="giderTablosu">
+        <div class="grid-header">Gider Açıklaması</div>
+        <div class="grid-header">Tutar (TL)</div>
+        <div class="grid-header">Son Ödeme</div>
+        <div class="grid-header">Ödendi</div>
+    </div>
+    <button class="btn" onclick="giderSatiriEkle('', '', '', false, true)">+ Gider Ekle</button>
+
+    <div class="summary-box">
+        <div class="summary-row"><span>Toplam Gider:</span> <span id="toplamGider" style="color:#3498db; font-weight:bold;">0 TL</span></div>
+        <div class="summary-row"><span>Ödenen Tutar:</span> <span id="odenenGider" style="color: #2ecc71; font-weight:bold;">0 TL</span></div>
+        <div class="summary-row" style="font-weight: bold;"><span>Kalan Ödeme:</span> <span id="kalanGider" style="color: #e74c3c;">0 TL</span></div>
+    </div>
+
+    <h2>Gelirler</h2>
+    <div class="grid-table" style="grid-template-columns: 3fr 1fr;" id="gelirTablosu">
+        <div class="grid-header">Gelir Açıklaması</div>
+        <div class="grid-header">Tutar (TL)</div>
+    </div>
+    <button class="btn" style="background: #3498db;" onclick="gelirSatiriEkle('', '', true)">+ Gelir Ekle</button>
+    
+    <div class="summary-box" style="background: #e8f8f5;">
+        <div class="summary-row" style="font-weight: bold; border: none; color: #27ae60; font-size: 18px;">
+            <span>Gelirler Toplamı:</span> <span id="toplamGelir">0 TL</span>
+        </div>
+    </div>
+</div>
+
+<script>
+    // SENİN FIREBASE PROJE BİLGİLERİN
+    const firebaseConfig = {
+        apiKey: "AIzaSyB2AtnX-D7Wv1_ONCc3nhOrQgAK4RWWPiE",
+        authDomain: "butcetakip-1addc.firebaseapp.com",
+        projectId: "butcetakip-1addc",
+        storageBucket: "butcetakip-1addc.firebasestorage.app",
+        messagingSenderId: "657917369506",
+        appId: "1:657917369506:web:8b3e9224f5ccd817eccbfb"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    let aktifKullanici = ""; 
+    let isLoginMode = true; // Giriş modu mu, kayıt modu mu takibi
+
+    // EKRAN MODUNU DEĞİŞTİRME (Giriş <-> Kayıt)
+    function toggleAuthMode() {
+        isLoginMode = !isLoginMode;
+        const title = document.getElementById('auth-title');
+        const desc = document.getElementById('auth-desc');
+        const mainBtn = document.getElementById('main-auth-btn');
+        const toggleBtn = document.getElementById('toggle-auth-btn');
+        document.getElementById('login-error').style.display = 'none';
+
+        if(isLoginMode) {
+            title.innerText = "Bütçe Cloud Giriş";
+            desc.innerText = "Hesabınız yoksa kayıt olabilirsiniz.";
+            mainBtn.innerText = "Giriş Yap";
+            mainBtn.setAttribute("onclick", "login()");
+            toggleBtn.innerText = "Hesabın Yok mu? Kayıt Ol";
+        } else {
+            title.innerText = "Yeni Hesap Oluştur";
+            desc.innerText = "Ortaklarınızla aynı bilgileri kullanarak da giriş yapabilirsiniz.";
+            mainBtn.innerText = "Kayıt Ol ve Başla";
+            mainBtn.setAttribute("onclick", "register()");
+            toggleBtn.innerText = "Zaten Hesabım Var? Giriş Yap";
+        }
+    }
+
+    // YENİ KULLANICI KAYDI
+    function register() {
+        const user = document.getElementById('username').value.trim().toLowerCase();
+        const pass = document.getElementById('password').value.trim();
+        const errorText = document.getElementById('login-error');
+
+        if(!user || !pass) {
+            showError("Lütfen tüm alanları doldurun!");
+            return;
+        }
+
+        // Önce bu kullanıcı adı alınmış mı kontrol et
+        db.collection("users").doc(user).get().then((doc) => {
+            if (doc.exists) {
+                showError("Bu kullanıcı adı zaten alınmış!");
+            } else {
+                // Kullanıcıyı oluştur
+                db.collection("users").doc(user).set({
+                    password: btoa(pass) // Şifreyi maskeleyerek buluta yaz
+                }).then(() => {
+                    alert("Hesabınız başarıyla oluşturuldu! Şimdi giriş yapabilirsiniz.");
+                    toggleAuthMode();
+                });
+            }
+        });
+    }
+
+    // KULLANICI GİRİŞİ
+    function login() {
+        const user = document.getElementById('username').value.trim().toLowerCase();
+        const pass = document.getElementById('password').value.trim();
+
+        if(!user || !pass) {
+            showError("Lütfen tüm alanları doldurun!");
+            return;
+        }
+
+        db.collection("users").doc(user).get().then((doc) => {
+            if (doc.exists && atob(doc.data().password) === pass) {
+                aktifKullanici = user;
+                document.getElementById('display-user').innerText = user;
+                document.getElementById('login-screen').style.display = 'none';
+                document.getElementById('app-content').style.display = 'block';
+                verileriBuluttanYukle();
+            } else {
+                showError("Hatalı kullanıcı adı veya şifre!");
+            }
+        }).catch(() => {
+            showError("Bağlantı hatası oluştu!");
+        });
+    }
+
+    function showError(msg) {
+        const errorText = document.getElementById('login-error');
+        errorText.innerText = msg;
+        errorText.style.display = 'block';
+    }
+
+    function logout() {
+        location.reload();
+    }
+
+    // VERİLERİ KULLANICIYA ÖZEL ODADA KAYDETME
+    function verileriBulutaKaydet() {
+        if(!aktifKullanici) return;
+
+        const giderler = [];
+        document.querySelectorAll('#giderTablosu .grid-cell-row').forEach(row => {
+            giderler.push({
+                ad: row.querySelector('.gider-ad').value,
+                tutar: row.querySelector('.gider-tutar').value,
+                tarih: row.querySelector('.gider-tarih').value,
+                odendi: row.querySelector('.gider-odendi').checked
+            });
+        });
+
+        const gelirler = [];
+        document.querySelectorAll('#gelirTablosu .grid-cell-row').forEach(row => {
+            gelirler.push({
+                ad: row.querySelector('.gelir-ad').value,
+                tutar: row.querySelector('.gelir-tutar').value
+            });
+        });
+
+        // Veriyi 'butceData' koleksiyonu altında her kullanıcı adı için ayrı bir dökümana kaydediyoruz
+        db.collection("butceData").doc(aktifKullanici).set({
+            giderler: giderler,
+            gelirler: gelirler
+        }).then(() => {
+            hesapla();
+        });
+    }
+
+    // VERİLERİ SADECE O KULLANICI İÇİN ÇEKME
+    function verileriBuluttanYukle() {
+        db.collection("butceData").doc(aktifKullanici).get().then((doc) => {
+            document.querySelectorAll('.grid-cell-row').forEach(e => e.remove());
+
+            if (doc.exists) {
+                const data = doc.data();
+                if(data.giderler && data.giderler.length > 0) {
+                    data.giderler.forEach(g => giderSatiriEkle(g.ad, g.tutar, g.tarih, g.odendi, false));
+                } else { giderSatiriEkle(); }
+                
+                if(data.gelirler && data.gelirler.length > 0) {
+                    data.gelirler.forEach(g => gelirSatiriEkle(g.ad, g.tutar, false));
+                } else { gelirSatiriEkle(); }
+            } else {
+                giderSatiriEkle();
+                gelirSatiriEkle();
+            }
+            hesapla();
+        });
+    }
+
+    // SATIR EKLEME
+    function giderSatiriEkle(ad='', tutar='', tarih='', odendi=false, tetikleme=false) {
+        const tablo = document.getElementById('giderTablosu');
+        const html = `
+            <div class="grid-cell-row" style="display: contents;">
+                <div class="grid-cell"><input type="text" value="${ad}" class="gider-ad" placeholder="Örn: Kira" onchange="verileriBulutaKaydet()"></div>
+                <div class="grid-cell"><input type="number" value="${tutar}" class="gider-tutar" placeholder="0" onchange="verileriBulutaKaydet()"></div>
+                <div class="grid-cell"><input type="date" value="${tarih}" class="gider-tarih" onchange="verileriBulutaKaydet()"></div>
+                <div class="grid-cell"><input type="checkbox" ${odendi ? 'checked' : ''} class="gider-odendi" onchange="verileriBulutaKaydet()"></div>
+            </div>`;
+        tablo.insertAdjacentHTML('beforeend', html);
+        if(tetikleme) verileriBulutaKaydet();
+    }
+
+    function gelirSatiriEkle(ad='', tutar='', tetikleme=false) {
+        const tablo = document.getElementById('gelirTablosu');
+        const html = `
+            <div class="grid-cell-row" style="display: contents;">
+                <div class="grid-cell"><input type="text" value="${ad}" class="gelir-ad" placeholder="Örn: Maaş" onchange="verileriBulutaKaydet()"></div>
+                <div class="grid-cell"><input type="number" value="${tutar}" class="gelir-tutar" placeholder="0" onchange="verileriBulutaKaydet()"></div>
+            </div>`;
+        tablo.insertAdjacentHTML('beforeend', html);
+        if(tetikleme) verileriBulutaKaydet();
+    }
+
+    // MATEMATİKSEL HESAPLAMA
+    function hesapla() {
+        let tGider = 0, oGider = 0, tGelir = 0;
+        
+        document.querySelectorAll('#giderTablosu .grid-cell-row').forEach(row => {
+            let v = parseFloat(row.querySelector('.gider-tutar').value) || 0;
+            tGider += v;
+            if(row.querySelector('.gider-odendi').checked) oGider += v;
+        });
+
+        document.querySelectorAll('#gelirTablosu .grid-cell-row').forEach(row => {
+            tGelir += parseFloat(row.querySelector('.gelir-tutar').value) || 0;
+        });
+
+        document.getElementById('toplamGider').innerText = tGider.toLocaleString('tr-TR') + " TL";
+        document.getElementById('odenenGider').innerText = oGider.toLocaleString('tr-TR') + " TL";
+        document.getElementById('kalanGider').innerText = (tGider - oGider).toLocaleString('tr-TR') + " TL";
+        document.getElementById('toplamGelir').innerText = tGelir.toLocaleString('tr-TR') + " TL";
+    }
+</script>
+</body>
+</html>
