@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bütçe Pro - Güvenli Takip</title>
+    <style>
+        /* Önceki stillere ek olarak Giriş Ekranı Stilleri */
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
+        body { background-color: #f4f6f9; padding: 10px; }
+        
+        #login-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #2c3e50; display: flex; align-items: center; justify-content: center; z-index: 1000;
+        }
+        .login-card {
+            background: white; padding: 30px; border-radius: 12px; width: 90%; max-width: 400px; text-align: center;
+        }
+        .login-card input {
+            width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 6px;
+        }
+        
+        /* Ana Uygulama Konteynırı (Giriş yapana kadar gizli) */
+        #app-content { display: none; max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 12px; }
+
+        /* Mevcut Tablo Stilleri */
+        .grid-table { display: grid; grid-template-columns: 2fr 1fr 1.5fr 0.8fr; gap: 1px; background: #ddd; margin-bottom: 10px; }
+        .grid-header { background: #34495e; color: white; padding: 10px; font-weight: bold; text-align: center; }
+        .grid-cell { background: white; padding: 5px; }
+        input { width: 100%; border: none; padding: 8px; outline: none; }
+        .btn { background: #2ecc71; color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; width: 100%; margin: 10px 0; }
+        .summary-box { background: #eee; padding: 15px; border-radius: 8px; margin-top: 10px; }
+        .summary-row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #ccc; }
+    </style>
+</head>
+<body>
+
+<!-- GİRİŞ EKRANI -->
+<div id="login-screen">
+    <div class="login-card">
+        <h2>Bütçe Pro Giriş</h2>
+        <input type="text" id="username" placeholder="Kullanıcı Adı (admin)">
+        <input type="password" id="password" placeholder="Şifre (1234)">
+        <button class="btn" onclick="login()">Giriş Yap</button>
+        <p id="login-error" style="color: red; display: none; font-size: 14px;">Hatalı bilgi!</p>
+    </div>
+</div>
+
+<!-- ANA UYGULAMA -->
+<div id="app-content">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h2>Giderler</h2>
+        button onclick="logout()" style="background: none; border: none; color: #e74c3c; cursor: pointer;">Çıkış Yapbutton>
+    </div>
+    
+    <div class="grid-table" id="giderTablosu">
+        <div class="grid-header">Gider</div>
+        <div class="grid-header">Tutar</div>
+        <div class="grid-header">Tarih</div>
+        <div class="grid-header">Ödendi</div>
+    </div>
+    <button class="btn" onclick="giderSatiriEkle()">+ Gider Ekle</button>
+
+    <div class="summary-box">
+        <div class="summary-row"><span>Toplam Gider:</span> <span id="toplamGider">0 TL</span></div>
+        <div class="summary-row"><span>Ödenen:</span> span id="odenenGider" style="color: green;">0 TL</span></div>
+        <div class="summary-row" style="font-weight: bold;"><span>Kalan:</span> <span id="kalanGider" style="color: red;">0 TL</span></div>
+    </div>
+
+    <h2>Gelirler</h2>
+    <div class="grid-table" style="grid-template-columns: 3fr 1fr;" id="gelirTablosu">
+        <div class="grid-header">Gelir Açıklaması</div>
+        <div class="grid-header">Tutar</div>
+    </div>
+    <button class="btn" style="background: #3498db;" onclick="gelirSatiriEkle()">+ Gelir Ekle</button>
+    
+    <div class="summary-box" style="background: #d5f5e3;">
+        <div class="summary-row" style="font-weight: bold;"><span>Toplam Gelir:</span> <span id="toplamGelir">0 TL</span></div>
+    </div>
+</div>
+
+<script>
+    // 1. GÜVENLİK VE GİRİŞ SİSTEMİ
+    function login() {
+        const user = document.getElementById('username').value;
+        const pass = document.getElementById('password').value;
+        
+        if(user === "admin" && pass === "1234") { // Basit şifreleme
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('app-content').style.display = 'block';
+            verileriYukle(); // Giriş yapınca verileri getir
+        } else {
+            document.getElementById('login-error').style.display = 'block';
+        }
+    }
+
+    function logout() {
+        location.reload(); // Sayfayı yenileyerek çıkış yap
+    }
+
+    // 2. VERİLERİ KAYDETME (LocalStorage)
+    function verileriKaydet() {
+        const giderler = [];
+        document.querySelectorAll('#giderTablosu .grid-cell-row').forEach(row => {
+            giderler.push({
+                ad: row.querySelector('.gider-ad').value,
+                tutar: row.querySelector('.gider-tutar').value,
+                tarih: row.querySelector('.gider-tarih').value,
+                odendi: row.querySelector('.gider-odendi').checked
+            });
+        });
+
+        const gelirler = [];
+        document.querySelectorAll('#gelirTablosu .grid-cell-row').forEach(row => {
+            gelirler.push({
+                ad: row.querySelector('.gelir-ad').value,
+                tutar: row.querySelector('.gelir-tutar').value
+            });
+        });
+
+        localStorage.setItem('butceData', JSON.stringify({giderler, gelirler}));
+        hesapla();
+    }
+
+    // 3. VERİLERİ YÜKLEME
+    function verileriYukle() {
+        const data = JSON.parse(localStorage.getItem('butceData'));
+        if(data) {
+            data.giderler.forEach(g => giderSatiriEkle(g.ad, g.tutar, g.tarih, g.odendi));
+            data.gelirler.forEach(g => gelirSatiriEkle(g.ad, g.tutar));
+        } else {
+            giderSatiriEkle(); // Veri yoksa bir tane boş satır aç
+            gelirSatiriEkle();
+        }
+        hesapla();
+    }
+
+    // 4. SATIR EKLEME FONKSİYONLARI (Güncellenmiş)
+    function giderSatiriEkle(ad='', tutar='', tarih='', odendi=false) {
+        const tablo = document.getElementById('giderTablosu');
+        const id = Date.now();
+        const html = `
+            <div class="grid-cell-row" style="display: contents;">
+                <div class="grid-cell"><input type="text" value="${ad}" class="gider-ad" oninput="verileriKaydet()"></div>
+                <div class="grid-cell"><input type="number" value="${tutar}" class="gider-tutar" oninput="verileriKaydet()"></div>
+                <div class="grid-cell"><input type="date" value="${tarih}" class="gider-tarih" oninput="verileriKaydet()"></div>
+                <div class="grid-cell" style="text-align:center"><input type="checkbox" ${odendi ? 'checked' : ''} class="gider-odendi" onchange="verileriKaydet()"></div>
+            </div>`;
+        tablo.insertAdjacentHTML('beforeend', html);
+    }
+
+    function gelirSatiriEkle(ad='', tutar='') {
+        const tablo = document.getElementById('gelirTablosu');
+        const html = `
+            <div class="grid-cell-row" style="display: contents;">
+                <div class="grid-cell"><input type="text" value="${ad}" class="gelir-ad" oninput="verileriKaydet()"></div>
+                <div class="grid-cell"><input type="number" value="${tutar}" class="gelir-t```
+
+---
+
+### 2. Bunu Nasıl iPhone (utar" oninput="verileriKaydet()"></div>
+            </div>`;
+        tablo.insertAdjacentHTML('beforeend', html);
+    }
+
+    function hesapla() {
+        let tGider = 0, oGider = 0, tGelir = 0;
+        
+        iOS) Uygulamasına Çevirirsin?
+
+Bir web sitesini (yukarıdaki kod) gerçek bir mobil uygulamaya dönüştürmek için endocument.querySelectorAll('#giderTablosu .grid-cell-row').forEach(row => {
+            let v = parseFloat(row.querySelector('.gider-tutar').value) || 0;
+            tGider += v;
+            if(row.querySelector('.gider-odendi profesyonel ve güncel yol **Capacitor** kullanmaktır. Adım adım ne yapman gerektiğini anlatıyorum:
+
+**Gereksinimler:** Bir').checked) oGider += v;
+        });
+
+        document.querySelectorAll('#gelirTablosu .grid-cell-row').forEach( Apple bilgisayar (Mac) ve yüklü bir **Xcode** olması gerekir (iOS için Apple'ın şartı budur).
+
+1.  **Klasrow => {
+            tGelir += parseFloat(row.querySelector('.gelir-tutar').value) || 0;
+        });
+
+        document.getElementById('toplamGider').innerText = tGider + " TL";
+        document.getElementById('odenenGider').innerText = oör Hazırla:** Bilgisayarında bir klasör oluştur ve içindeki dosyayı `index.html` yap.
+2.  **Node.js YGider + " TL";
+        document.getElementById('kalanGider').innerText = (tGider - oGider) + " TL";ükle:** Bilgisayarına `node.js` indir ve kur.
+3.  **Terminali Aç ve Şu Komutları Sırayla Yaz
+        document.getElementById('toplamGelir').innerText = tGelir + " TL";
+    }
+</script>
+</body>
+</html>
+:**
+    *   `npm install @capacitor/core @capacitor/cli` (Gerekli araçları yükler)
+    *   `npx cap init
