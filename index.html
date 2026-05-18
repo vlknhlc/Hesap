@@ -308,7 +308,6 @@
         });
     }
 
-    // YENİ KESİN TETİKLENEN GIDER SATIRI YAPISI
     function giderSatiriEkle(ad='', tutar='', gun='', odendi=false, tetikleme=false) {
         const tablo = document.getElementById('giderTablosu');
         const rowId = 'gider_' + Date.now() + Math.floor(Math.random() * 100);
@@ -319,7 +318,7 @@
                 <div class="grid-cell"><input type="number" value="${tutar}" class="gider-tutar" placeholder="0" onchange="taksitKontrol('${rowId}')"></div>
                 <div class="grid-cell"><input type="number" value="${gun}" class="gider-gun" placeholder="Gün (1-31)" min="1" max="31" onchange="taksitKontrol('${rowId}')"></div>
                 <div class="grid-cell"><input type="checkbox" ${odendi ? 'checked' : ''} class="gider-odendi" onchange="verileriBulutaKaydet()"></div>
-                <div class="grid-cell"><button class="delete-btn" onclick="satirSil('${rowId}')">❌</button></div>
+                <div class="grid-cell"><button class="delete-btn" onclick="giderSatirSilKontrol('${rowId}')">❌</button></div>
             </div>`;
         tablo.insertAdjacentHTML('beforeend', html);
         if(tetikleme) verileriBulutaKaydet();
@@ -332,18 +331,81 @@
             <div class="grid-cell-row" id="${rowId}" style="display: contents;">
                 <div class="grid-cell"><input type="text" value="${ad}" class="gelir-ad" placeholder="Örn: Maaş" onchange="verileriBulutaKaydet()"></div>
                 <div class="grid-cell"><input type="number" value="${tutar}" class="gelir-tutar" placeholder="0" onchange="verileriBulutaKaydet()"></div>
-                <div class="grid-cell"><button class="delete-btn" onclick="satirSil('${rowId}')">❌</button></div>
+                <div class="grid-cell"><button class="delete-btn" onclick="gelirSatirSil('${rowId}')">❌</button></div>
             </div>`;
         tablo.insertAdjacentHTML('beforeend', html);
         if(tetikleme) verileriBulutaKaydet();
     }
 
-    function satirSil(id) {
+    function gelirSatirSil(id) {
         document.getElementById(id).remove();
         verileriBulutaKaydet();
     }
 
-    // ARTIK KESİN ÇALIŞAN TAKSİTLENDİRME MOTORU
+    // 1. SORUNUN ÇÖZÜMÜ: AKILLI TOPLU TAKSİT SİLME MOTORU
+    function giderSatirSilKontrol(rowId) {
+        const row = document.getElementById(rowId);
+        if(!row) return;
+
+        const ad = row.querySelector('.gider-ad').value.trim();
+
+        // Eğer bu bir taksitli giderse (Adının içinde parantezli taksit ifadesi varsa)
+        if(ad.includes("(") && ad.includes("/")) {
+            // Taksit ana adını temizleyerek alalım (Örn: "Telefon (2/6)" -> "Telefon")
+            const hamAd = ad.split("(")[0].trim();
+
+            const secim = confirm(`"${ad}" bir taksitli işlemdir.\n\nTAMAM: Bu aydan itibaren gelecekteki TÜM "${hamAd}" taksitlerini sil.\nİPTAL: Sadece bu ayki taksiti sil.`);
+            
+            if(secim) {
+                // GELECEKTEKİ TÜM TAKSİTLERİ SİLME ALGORİTMASI
+                let sYil = parseInt(document.getElementById('select-year').value);
+                let sAy = parseInt(document.getElementById('select-month').value);
+                
+                let temizlikSözleri = [];
+
+                // Güvenlik sınırı olarak önümüzdeki 60 ayı (5 yıl) tarıyoruz
+                for(let i = 0; i < 60; i++) {
+                    let mevcutAy = sAy + i;
+                    let mevcutYil = sYil;
+                    
+                    if(mevcutAy > 11) {
+                        mevcutYil += Math.floor(mevcutAy / 12);
+                        mevcutAy = mevcutAy % 12;
+                    }
+
+                    const donemKey = `${mevcutYil}_${mevcutAy}`;
+
+                    let gorev = db.collection("kullanici_verileri").doc(aktifKullaniciDoc).collection("donemler").doc(donemKey).get().then((doc) => {
+                        if(doc.exists) {
+                            let dGiderler = doc.data().giderler || [];
+                            let dGelirler = doc.data().gelirler || [];
+                            
+                            // İsmi hamAd ile başlayan ve taksit formatı içerenleri filtreleyerek temizle
+                            let yeniGiderler = dGiderler.filter(g => !(g.ad.startsWith(hamAd) && g.ad.includes("(")));
+                            
+                            return db.collection("kullanici_verileri").doc(aktifKullaniciDoc).collection("donemler").doc(donemKey).set({
+                                giderler: yeniGiderler,
+                                gelirler: dGelirler
+                            });
+                        }
+                    });
+                    temizlikSözleri.push(gorev);
+                }
+
+                Promise.all(temizlikSözleri).then(() => {
+                    alert(`"${hamAd}" taksit serisi bu aydan itibaren tamamen silindi!`);
+                    verileriBuluttanYukle();
+                });
+                return; // Fonksiyondan çık
+            }
+        }
+
+        // Eğer normal bir giderse veya sadece bu ay silinmek istendiyse
+        row.remove();
+        verileriBulutaKaydet();
+    }
+
+    // 2. SORUNUN ÇÖZÜMÜ: ÇİFT SATIR OLUŞMA HATASI GİDERİLDİ
     function taksitKontrol(rowId) {
         const row = document.getElementById(rowId);
         if(!row) return;
@@ -352,19 +414,17 @@
         const tutar = row.querySelector('.gider-tutar').value.trim();
         const gun = row.querySelector('.gider-gun').value.trim();
 
-        // 3 alandan biri bile eksikse sadece normal kaydet, taksit sorma
         if(!ad || !tutar || !gun) {
             verileriBulutaKaydet();
             return;
         }
 
-        // Eğer bu gider ismi zaten "(1/" içeriyorsa, bu zaten bir taksittir, tekrar sorma.
-        if(ad.includes("(1/") || ad.includes("/")) {
+        // Zaten taksitlendirilmiş bir satırsa tekrar tetikleme yapma
+        if(ad.includes("(") && ad.includes("/")) {
             verileriBulutaKaydet();
             return;
         }
 
-        // Kullanıcıya sor
         setTimeout(() => {
             const cevap = confirm(`"${ad}" harcamasını taksitlendirmek istiyor musunuz?`);
             if(cevap) {
@@ -387,6 +447,11 @@
                         const donemKey = `${mevcutYil}_${mevcutAy}`;
                         const taksitAd = `${ad} (${i+1}/${taksitSayisi})`;
 
+                        // Aktif bulunulan ay ise ekrandaki satırı anlık güncelle (Çift satırı engelleyen nokta)
+                        if(i === 0) {
+                            row.querySelector('.gider-ad').value = taksitAd;
+                        }
+
                         let gorev = db.collection("kullanici_verileri").doc(aktifKullaniciDoc).collection("donemler").doc(donemKey).get().then((doc) => {
                             let dynamicGiderler = [];
                             let dynamicGelirler = [];
@@ -395,7 +460,11 @@
                                 dynamicGelirler = doc.data().gelirler || [];
                             }
                             
-                            // Mükerrer (çift) kayıt olmasını engellemek için kontrol
+                            // Eğer bu ay aktif ay ise, ham halini silip taksitli halini listeye ekliyoruz
+                            if(i === 0) {
+                                dynamicGiderler = dynamicGiderler.filter(g => g.ad !== ad);
+                            }
+
                             if(!dynamicGiderler.some(g => g.ad === taksitAd)) {
                                 dynamicGiderler.push({ ad: taksitAd, tutar: tutar, gun: gun, odendi: false });
                             }
