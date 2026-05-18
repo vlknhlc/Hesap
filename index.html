@@ -221,7 +221,7 @@
                 document.getElementById('display-user').innerText = email;
                 document.getElementById('login-screen').style.display = 'none';
                 document.getElementById('app-content').style.display = 'block';
-                verileriBuluttanYukle();
+                verileriBuluttanYukle(true); // Girişte bildirim kontrolü tetiklensin
             } else {
                 showError("Hatalı e-posta veya şifre!");
             }
@@ -264,37 +264,57 @@
 
         const giderler = [];
         document.querySelectorAll('#giderTablosu .grid-cell-row').forEach(row => {
-            giderler.push({
-                ad: row.querySelector('.gider-ad').value,
-                tutar: row.querySelector('.gider-tutar').value,
-                gun: row.querySelector('.gider-gun').value,
-                odendi: row.querySelector('.gider-odendi').checked
-            });
+            const ad = row.querySelector('.gider-ad').value;
+            const tutar = row.querySelector('.gider-tutar').value;
+            const gun = row.querySelector('.gider-gun').value;
+            const odendi = row.querySelector('.gider-odendi').checked;
+            
+            // Sadece tamamen boş olmayan satırları kaydet
+            if(ad || tutar || gun) {
+                giderler.push({ ad, tutar, gun, odendi });
+            }
         });
 
         const gelirler = [];
         document.querySelectorAll('#gelirTablosu .grid-cell-row').forEach(row => {
-            gelirler.push({
-                ad: row.querySelector('.gelir-ad').value,
-                tutar: row.querySelector('.gelir-tutar').value
-            });
+            const ad = row.querySelector('.gelir-ad').value;
+            const tutar = row.querySelector('.gelir-tutar').value;
+            if(ad || tutar) {
+                gelirler.push({ ad, tutar });
+            }
         });
 
         db.collection("kullanici_verileri").doc(aktifKullaniciDoc).collection("donemler").doc(donem).set({
             giderler: giderler,
             gelirler: gelirler
-        }).then(() => hesapla());
+        }).then(() => {
+            hesapla();
+            giderleriSirala(); // Her kayıttan sonra otomatik gün sırasına diz
+        });
     }
 
-    function verileriBuluttanYukle() {
+    function verileriBuluttanYukle(bildirimKontrol = false) {
         const donem = getDonemKey();
         db.collection("kullanici_verileri").doc(aktifKullaniciDoc).collection("donemler").doc(donem).get().then((doc) => {
             document.querySelectorAll('.grid-cell-row').forEach(e => e.remove());
 
             if (doc.exists) {
                 const data = doc.data();
+                
+                // GİDERLERİ YÜKLERKEN ÖNCE GÜNE GÖRE SIRALA (YAKINDAN UZAĞA)
                 if(data.giderler && data.giderler.length > 0) {
-                    data.giderler.forEach(g => giderSatiriEkle(g.ad, g.tutar, g.gun, g.odendi, false));
+                    let siraliGiderler = [...data.giderler].sort((a, b) => {
+                        let gunA = parseInt(a.gun) || 999;
+                        let gunB = parseInt(b.gun) || 999;
+                        return gunA - gunB;
+                    });
+
+                    siraliGiderler.forEach(g => giderSatiriEkle(g.ad, g.tutar, g.gun, g.odendi, false));
+                    
+                    // BİLDİRİM MOTORU: Günü geçmiş ve ödenmemişleri bul
+                    if(bildirimKontrol) {
+                        tarihVeBildirimKontrol(data.giderler);
+                    }
                 } else { giderSatiriEkle(); }
                 
                 if(data.gelirler && data.gelirler.length > 0) {
@@ -306,6 +326,47 @@
             }
             hesapla();
         });
+    }
+
+    // BİLDİRİM KONTROL FONKSİYONU
+    function tarihVeBildirimKontrol(giderListesi) {
+        const bugun = new Date();
+        const aktifYil = parseInt(document.getElementById('select-year').value);
+        const aktifAy = parseInt(document.getElementById('select-month').value);
+
+        // Eğer bakılan dönem şu anki gerçek takvim ayıyla eşleşiyorsa kontrol et
+        if(bugun.getFullYear() === aktifYil && bugun.getMonth() === aktifAy) {
+            const guncelGun = bugun.getDate();
+            let gecikenler = [];
+
+            giderListesi.forEach(g => {
+                let gGun = parseInt(g.gun);
+                if(gGun && gGun < guncelGun && !g.odendi && g.ad) {
+                    gecikenler.push(g.ad);
+                }
+            });
+
+            if(gecikenler.length > 0) {
+                setTimeout(() => {
+                    alert(`🚨 Ödeme Günü Geçmiş Giderleriniz Var!\n\nLütfen şu harcamaları kontrol edin:\n👉 ${gecikenler.join(", ")}`);
+                }, 600);
+            }
+        }
+    }
+
+    // ANLIK SIRALAMA MOTORU (Dinamik Arayüz Sıralaması)
+    function giderleriSirala() {
+        const tablo = document.getElementById('giderTablosu');
+        const satirlar = Array.from(tablo.querySelectorAll('.grid-cell-row'));
+        
+        satirlar.sort((a, b) => {
+            let gunA = parseInt(a.querySelector('.gider-gun').value) || 999;
+            let gunB = parseInt(b.querySelector('.gider-gun').value) || 999;
+            return gunA - gunB;
+        });
+
+        // Mevcut DOM elemanlarını sıralı düzende tabloya yeniden ekle
+        satirlar.forEach(satir => tablo.appendChild(satir));
     }
 
     function giderSatiriEkle(ad='', tutar='', gun='', odendi=false, tetikleme=false) {
@@ -342,47 +403,35 @@
         verileriBulutaKaydet();
     }
 
-    // 1. SORUNUN ÇÖZÜMÜ: AKILLI TOPLU TAKSİT SİLME MOTORU
     function giderSatirSilKontrol(rowId) {
         const row = document.getElementById(rowId);
         if(!row) return;
 
         const ad = row.querySelector('.gider-ad').value.trim();
 
-        // Eğer bu bir taksitli giderse (Adının içinde parantezli taksit ifadesi varsa)
         if(ad.includes("(") && ad.includes("/")) {
-            // Taksit ana adını temizleyerek alalım (Örn: "Telefon (2/6)" -> "Telefon")
             const hamAd = ad.split("(")[0].trim();
-
             const secim = confirm(`"${ad}" bir taksitli işlemdir.\n\nTAMAM: Bu aydan itibaren gelecekteki TÜM "${hamAd}" taksitlerini sil.\nİPTAL: Sadece bu ayki taksiti sil.`);
             
             if(secim) {
-                // GELECEKTEKİ TÜM TAKSİTLERİ SİLME ALGORİTMASI
                 let sYil = parseInt(document.getElementById('select-year').value);
                 let sAy = parseInt(document.getElementById('select-month').value);
-                
                 let temizlikSözleri = [];
 
-                // Güvenlik sınırı olarak önümüzdeki 60 ayı (5 yıl) tarıyoruz
                 for(let i = 0; i < 60; i++) {
                     let mevcutAy = sAy + i;
                     let mevcutYil = sYil;
-                    
                     if(mevcutAy > 11) {
                         mevcutYil += Math.floor(mevcutAy / 12);
                         mevcutAy = mevcutAy % 12;
                     }
-
                     const donemKey = `${mevcutYil}_${mevcutAy}`;
 
                     let gorev = db.collection("kullanici_verileri").doc(aktifKullaniciDoc).collection("donemler").doc(donemKey).get().then((doc) => {
                         if(doc.exists) {
                             let dGiderler = doc.data().giderler || [];
                             let dGelirler = doc.data().gelirler || [];
-                            
-                            // İsmi hamAd ile başlayan ve taksit formatı içerenleri filtreleyerek temizle
                             let yeniGiderler = dGiderler.filter(g => !(g.ad.startsWith(hamAd) && g.ad.includes("(")));
-                            
                             return db.collection("kullanici_verileri").doc(aktifKullaniciDoc).collection("donemler").doc(donemKey).set({
                                 giderler: yeniGiderler,
                                 gelirler: dGelirler
@@ -396,16 +445,13 @@
                     alert(`"${hamAd}" taksit serisi bu aydan itibaren tamamen silindi!`);
                     verileriBuluttanYukle();
                 });
-                return; // Fonksiyondan çık
+                return;
             }
         }
-
-        // Eğer normal bir giderse veya sadece bu ay silinmek istendiyse
         row.remove();
         verileriBulutaKaydet();
     }
 
-    // 2. SORUNUN ÇÖZÜMÜ: ÇİFT SATIR OLUŞMA HATASI GİDERİLDİ
     function taksitKontrol(rowId) {
         const row = document.getElementById(rowId);
         if(!row) return;
@@ -419,7 +465,6 @@
             return;
         }
 
-        // Zaten taksitlendirilmiş bir satırsa tekrar tetikleme yapma
         if(ad.includes("(") && ad.includes("/")) {
             verileriBulutaKaydet();
             return;
@@ -432,13 +477,11 @@
                 if(taksitSayisi && taksitSayisi > 1) {
                     let sYil = parseInt(document.getElementById('select-year').value);
                     let sAy = parseInt(document.getElementById('select-month').value);
-                    
                     let bakiyeYazmaSozu = [];
 
                     for(let i = 0; i < taksitSayisi; i++) {
                         let mevcutAy = sAy + i;
                         let mevcutYil = sYil;
-                        
                         if(mevcutAy > 11) {
                             mevcutYil += Math.floor(mevcutAy / 12);
                             mevcutAy = mevcutAy % 12;
@@ -447,7 +490,6 @@
                         const donemKey = `${mevcutYil}_${mevcutAy}`;
                         const taksitAd = `${ad} (${i+1}/${taksitSayisi})`;
 
-                        // Aktif bulunulan ay ise ekrandaki satırı anlık güncelle (Çift satırı engelleyen nokta)
                         if(i === 0) {
                             row.querySelector('.gider-ad').value = taksitAd;
                         }
@@ -460,7 +502,6 @@
                                 dynamicGelirler = doc.data().gelirler || [];
                             }
                             
-                            // Eğer bu ay aktif ay ise, ham halini silip taksitli halini listeye ekliyoruz
                             if(i === 0) {
                                 dynamicGiderler = dynamicGiderler.filter(g => g.ad !== ad);
                             }
