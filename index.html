@@ -75,7 +75,7 @@
 <!-- ANA UYGULAMA -->
 <div id="app-content">
     
-    <!-- Üst Bar ve Ay Seçici (Excel Sekmeleri Mantığı) -->
+    <!-- Üst Bar ve Ay Seçici -->
     <div class="month-selector-box">
         <div>
             <label style="font-weight: bold; margin-right: 5px;">Çalışılan Dönem:</label>
@@ -122,7 +122,6 @@
 </div>
 
 <script>
-    // FIREBASE PROJE BİLGİLERİN
     const firebaseConfig = {
         apiKey: "AIzaSyB2AtnX-D7Wv1_ONCc3nhOrQgAK4RWWPiE",
         authDomain: "butcetakip-1addc.firebaseapp.com",
@@ -137,31 +136,22 @@
 
     let aktifKullaniciDoc = ""; 
     let isLoginMode = true;
-
-    // Aylar ve Yıllar Dizisi (Dinamik Seçim Alanı İçin)
     const aylar = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
     
-    // Sayfa Açıldığında Seçim Kutularını Doldur
     window.onload = function() {
         const mSelect = document.getElementById('select-month');
         const ySelect = document.getElementById('select-year');
         
         aylar.forEach((ay, index) => {
             let opt = document.createElement('option');
-            opt.value = index;
-            opt.innerText = ay;
-            mSelect.appendChild(opt);
+            opt.value = index; opt.innerText = ay; mSelect.appendChild(opt);
         });
 
-        // 2025 ile 2030 yılları arasını ekleyelim
         for(let y = 2025; y <= 2030; y++) {
             let opt = document.createElement('option');
-            opt.value = y;
-            opt.innerText = y;
-            ySelect.appendChild(opt);
+            opt.value = y; opt.innerText = y; ySelect.appendChild(opt);
         }
 
-        // Şu anki tarihi otomatik seç (Örn: Haziran 2026)
         const d = new Date();
         mSelect.value = d.getMonth();
         ySelect.value = d.getFullYear();
@@ -190,7 +180,6 @@
         }
     }
 
-    // E-POSTA İLE KAYIT
     function register() {
         const email = document.getElementById('email').value.trim().toLowerCase();
         const pass = document.getElementById('password').value.trim();
@@ -200,9 +189,7 @@
             return;
         }
 
-        // Firebase doküman isminde nokta istenmediği için temizliyoruz
         const docName = email.replace(/\./g, "_");
-
         db.collection("sistem_kullanicilari").doc(docName).get().then((doc) => {
             if (doc.exists) {
                 showError("Bu e-posta adresi zaten kayıtlı!");
@@ -218,7 +205,6 @@
         });
     }
 
-    // E-POSTA İLE GİRİŞ
     function login() {
         const email = document.getElementById('email').value.trim().toLowerCase();
         const pass = document.getElementById('password').value.trim();
@@ -242,7 +228,6 @@
         }).catch(() => showError("Bağlantı hatası!"));
     }
 
-    // 1. SORU İÇİN GEÇİCİ ŞİFRE KURTARMA ÇÖZÜMÜ
     function forgotPassword() {
         const email = document.getElementById('email').value.trim().toLowerCase();
         if(!email) {
@@ -267,14 +252,12 @@
 
     function logout() { location.reload(); }
 
-    // DÖNEM BİLGİSİNİ ALMA (Örn: "2026_5" yani 2026 Haziran)
     function getDonemKey() {
         const y = document.getElementById('select-year').value;
         const m = document.getElementById('select-month').value;
         return `${y}_${m}`;
     }
 
-    // VERİLERİ BULUTA KAYDETME
     function verileriBulutaKaydet() {
         if(!aktifKullaniciDoc) return;
         const donem = getDonemKey();
@@ -303,7 +286,6 @@
         }).then(() => hesapla());
     }
 
-    // VERİLERİ BULUTTAN ÇEKME (Excel Sekme Mantığı)
     function verileriBuluttanYukle() {
         const donem = getDonemKey();
         db.collection("kullanici_verileri").doc(aktifKullaniciDoc).collection("donemler").doc(donem).get().then((doc) => {
@@ -326,16 +308,16 @@
         });
     }
 
-    // GİDER SATIRI EKLEME (Taksitlendirme Entegre Edildi)
+    // YENİ KESİN TETİKLENEN GIDER SATIRI YAPISI
     function giderSatiriEkle(ad='', tutar='', gun='', odendi=false, tetikleme=false) {
         const tablo = document.getElementById('giderTablosu');
         const rowId = 'gider_' + Date.now() + Math.floor(Math.random() * 100);
         
         const html = `
             <div class="grid-cell-row" id="${rowId}" style="display: contents;">
-                <div class="grid-cell"><input type="text" value="${ad}" class="gider-ad" placeholder="Örn: Kira" onchange="verileriBulutaKaydet()"></div>
-                <div class="grid-cell"><input type="number" value="${tutar}" class="gider-tutar" placeholder="0" onchange="taksitKontrol(this)"></div>
-                <div class="grid-cell"><input type="number" value="${gun}" class="gider-gun" placeholder="Gün (1-31)" min="1" max="31" onchange="verileriBulutaKaydet()"></div>
+                <div class="grid-cell"><input type="text" value="${ad}" class="gider-ad" placeholder="Örn: Kira" onchange="taksitKontrol('${rowId}')"></div>
+                <div class="grid-cell"><input type="number" value="${tutar}" class="gider-tutar" placeholder="0" onchange="taksitKontrol('${rowId}')"></div>
+                <div class="grid-cell"><input type="number" value="${gun}" class="gider-gun" placeholder="Gün (1-31)" min="1" max="31" onchange="taksitKontrol('${rowId}')"></div>
                 <div class="grid-cell"><input type="checkbox" ${odendi ? 'checked' : ''} class="gider-odendi" onchange="verileriBulutaKaydet()"></div>
                 <div class="grid-cell"><button class="delete-btn" onclick="satirSil('${rowId}')">❌</button></div>
             </div>`;
@@ -343,7 +325,6 @@
         if(tetikleme) verileriBulutaKaydet();
     }
 
-    // GELİR SATIRI EKLEME
     function gelirSatiriEkle(ad='', tutar='', tetikleme=false) {
         const tablo = document.getElementById('gelirTablosu');
         const rowId = 'gelir_' + Date.now();
@@ -357,73 +338,89 @@
         if(tetikleme) verileriBulutaKaydet();
     }
 
-    // SATIR SİLME FONKSİYONU
     function satirSil(id) {
         document.getElementById(id).remove();
         verileriBulutaKaydet();
     }
 
-    // TAKSİTLENDİRME SİHİRBAZI (Bombalardan Biri)
-    function taksitKontrol(inputElement) {
-        const row = inputElement.closest('.grid-cell-row');
-        const ad = row.querySelector('.gider-ad').value;
-        const tutar = inputElement.value;
-        const gun = row.querySelector('.gider-gun').value;
+    // ARTIK KESİN ÇALIŞAN TAKSİTLENDİRME MOTORU
+    function taksitKontrol(rowId) {
+        const row = document.getElementById(rowId);
+        if(!row) return;
 
+        const ad = row.querySelector('.gider-ad').value.trim();
+        const tutar = row.querySelector('.gider-tutar').value.trim();
+        const gun = row.querySelector('.gider-gun').value.trim();
+
+        // 3 alandan biri bile eksikse sadece normal kaydet, taksit sorma
         if(!ad || !tutar || !gun) {
             verileriBulutaKaydet();
             return;
         }
 
-        const cevap = confirm(`"${ad}" gideri için taksitlendirme yapmak ister misiniz?`);
-        if(cevap) {
-            const taksitSayisi = parseInt(prompt("Kaç taksit yapılacak? (Örn: 6)"));
-            if(taksitSayisi > 1) {
-                let sYil = parseInt(document.getElementById('select-year').value);
-                let sAy = parseInt(document.getElementById('select-month').value);
-                
-                let bakiyeYazmaSözü = [];
+        // Eğer bu gider ismi zaten "(1/" içeriyorsa, bu zaten bir taksittir, tekrar sorma.
+        if(ad.includes("(1/") || ad.includes("/")) {
+            verileriBulutaKaydet();
+            return;
+        }
 
-                for(let i = 0; i < taksitSayisi; i++) {
-                    let mevcutAy = sAy + i;
-                    let mevcutYil = sYil;
+        // Kullanıcıya sor
+        setTimeout(() => {
+            const cevap = confirm(`"${ad}" harcamasını taksitlendirmek istiyor musunuz?`);
+            if(cevap) {
+                const taksitSayisi = parseInt(prompt("Kaç taksit yapılacak? (Örn: 6)"));
+                if(taksitSayisi && taksitSayisi > 1) {
+                    let sYil = parseInt(document.getElementById('select-year').value);
+                    let sAy = parseInt(document.getElementById('select-month').value);
                     
-                    if(mevcutAy > 11) {
-                        mevcutYil += Math.floor(mevcutAy / 12);
-                        mevcutAy = mevcutAy % 12;
+                    let bakiyeYazmaSozu = [];
+
+                    for(let i = 0; i < taksitSayisi; i++) {
+                        let mevcutAy = sAy + i;
+                        let mevcutYil = sYil;
+                        
+                        if(mevcutAy > 11) {
+                            mevcutYil += Math.floor(mevcutAy / 12);
+                            mevcutAy = mevcutAy % 12;
+                        }
+
+                        const donemKey = `${mevcutYil}_${mevcutAy}`;
+                        const taksitAd = `${ad} (${i+1}/${taksitSayisi})`;
+
+                        let gorev = db.collection("kullanici_verileri").doc(aktifKullaniciDoc).collection("donemler").doc(donemKey).get().then((doc) => {
+                            let dynamicGiderler = [];
+                            let dynamicGelirler = [];
+                            if(doc.exists) {
+                                dynamicGiderler = doc.data().giderler || [];
+                                dynamicGelirler = doc.data().gelirler || [];
+                            }
+                            
+                            // Mükerrer (çift) kayıt olmasını engellemek için kontrol
+                            if(!dynamicGiderler.some(g => g.ad === taksitAd)) {
+                                dynamicGiderler.push({ ad: taksitAd, tutar: tutar, gun: gun, odendi: false });
+                            }
+
+                            return db.collection("kullanici_verileri").doc(aktifKullaniciDoc).collection("donemler").doc(donemKey).set({
+                                giderler: dynamicGiderler,
+                                gelirler: dynamicGelirler
+                            });
+                        });
+                        bakiyeYazmaSozu.push(gorev);
                     }
 
-                    const donemKey = `${mevcutYil}_${mevcutAy}`;
-                    const taksitAd = `${ad} (${i+1}/${taksitSayisi})`;
-
-                    // Her bir aya ait verileri sırayla buluta ekleme görevi
-                    let gorev = db.collection("kullanici_verileri").doc(aktifKullaniciDoc).collection("donemler").doc(donemKey).get().then((doc) => {
-                        let dynamicGiderler = [];
-                        let dynamicGelirler = [];
-                        if(doc.exists) {
-                            dynamicGiderler = doc.data().giderler || [];
-                            dynamicGelirler = doc.data().gelirler || [];
-                        }
-                        dynamicGiderler.push({ ad: taksitAd, tutar: tutar, gun: gun, odendi: false });
-                        return db.collection("kullanici_verileri").doc(aktifKullaniciDoc).collection("donemler").doc(donemKey).set({
-                            giderler: dynamicGiderler,
-                            gelirler: dynamicGelirler
-                        });
+                    Promise.all(bakiyeYazmaSozu).then(() => {
+                        alert(`${taksitSayisi} aylık taksit başarıyla planlandı!`);
+                        verileriBuluttanYukle();
                     });
-                    bakiyeYazmaSözü.push(gorev);
+                } else {
+                    verileriBulutaKaydet();
                 }
-
-                Promise.all(bakiyeYazmaSözü).then(() => {
-                    alert(`${taksitSayisi} aylık taksitlendirme başarıyla diğer aylara dağıtıldı!`);
-                    verileriBuluttanYukle();
-                });
+            } else {
+                verileriBulutaKaydet();
             }
-        } else {
-            verileriBulutaKaydet();
-        }
+        }, 100);
     }
 
-    // MATEMATİKSEL HESAPLAMA
     function hesapla() {
         let tGider = 0, oGider = 0, tGelir = 0;
         
