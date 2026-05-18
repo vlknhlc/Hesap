@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Bütçe Takip Pro v10</title>
+    <title>Bütçe Takip Pro v11</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
     <style>
         :root { 
-            --primary: #2c3e50; --accent: #3498db; --danger: #e74c3c; --success: #27ae60;
+            --primary: #2c3e50; --accent: #3498db; --danger: #e74c3c; --success: #27ae60; --warning: #f39c12;
             --bg: #f4f7f6; --row-bg: #ffffff; --border: #dfe6e9;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
@@ -29,8 +29,14 @@
         .nav { background: var(--primary); color: white; padding: 12px; display: flex; justify-content: space-between; align-items: center; }
         .nav select { padding: 5px; border-radius: 4px; border: none; font-weight: bold; }
 
+        /* Progress Bar Alanı */
+        .progress-container { padding: 15px; background: #fff; border-bottom: 1px solid var(--border); }
+        .progress-label { display: flex; justify-content: space-between; font-size: 12px; font-weight: bold; margin-bottom: 5px; }
+        .progress-bg { width: 100%; height: 12px; background: #eee; border-radius: 10px; overflow: hidden; }
+        #progress-bar { height: 100%; width: 0%; background: var(--success); transition: 0.5s; }
+
         /* Tablo ve Excel Görünümü */
-        .section-header { background: #f8f9fa; padding: 10px; font-weight: bold; border-bottom: 1px solid var(--border); }
+        .section-header { background: #f8f9fa; padding: 10px; font-weight: bold; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
         .row { display: grid; border-bottom: 1px solid var(--border); align-items: center; min-height: 48px; background: var(--row-bg); }
         .g-row { grid-template-columns: 1fr 85px 55px 40px 35px; }
         .gel-row { grid-template-columns: 1fr 100px 35px; }
@@ -46,6 +52,7 @@
         .sum-line { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #eee; }
         .sum-line.total { border-bottom: none; font-size: 16px; font-weight: bold; color: var(--danger); }
         .btn-add { width: 100%; padding: 12px; border: none; background: #fff; color: var(--accent); font-weight: bold; cursor: pointer; }
+        .btn-copy { font-size: 10px; background: var(--accent); color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -56,7 +63,6 @@
         <input type="email" id="log-email" placeholder="E-posta" onkeydown="if(event.key==='Enter') authHareketi()">
         <input type="password" id="log-pass" placeholder="Şifre" onkeydown="if(event.key==='Enter') authHareketi()">
         <button class="btn-log" onclick="authHareketi()" id="log-main-btn">GİRİŞ YAP</button>
-        
         <div class="link-group">
             <span class="auth-link" onclick="modDegis()" id="log-toggle-link">Yeni Hesap Oluştur</span>
             <span class="forgot-link" onclick="sifreHatirlat()">Şifremi Unuttum?</span>
@@ -74,7 +80,20 @@
         <button onclick="location.reload()" style="background:var(--danger); color:white; border:none; padding:4px 8px; border-radius:4px; font-size:10px;">ÇIKIŞ</button>
     </div>
 
-    <div class="section-header" style="color:var(--danger)">📉 GİDERLER</div>
+    <div class="progress-container">
+        <div class="progress-label">
+            <span>Bütçe Kullanımı</span>
+            <span id="progress-percent">%0</span>
+        </div>
+        <div class="progress-bg">
+            <div id="progress-bar"></div>
+        </div>
+    </div>
+
+    <div class="section-header" style="color:var(--danger)">
+        <span>📉 GİDERLER</span>
+        <button class="btn-copy" onclick="gecenAyiKopyala()">Geçen Ayı Kopyala</button>
+    </div>
     <div class="row g-row head-cell" style="background:#f9f9f9; min-height:25px;">
         <div>AÇIKLAMA</div><div>TUTAR</div><div>GÜN</div><div>OK</div><div></div>
     </div>
@@ -118,7 +137,6 @@
         const pass = document.getElementById('log-pass').value;
         if(!email || !pass) { alert("Boş bırakmayın!"); return; }
         const uId = email.replace(/\./g, "_");
-
         if(isLogMode) {
             db.collection("sistem_kullanicilari").doc(uId).get().then(doc => {
                 if(doc.exists && doc.data().password == pass) {
@@ -126,12 +144,12 @@
                     document.getElementById('user-display').innerText = email;
                     document.getElementById('login-screen').style.display = 'none';
                     document.getElementById('app-content').style.display = 'block';
-                    verileriCek(true); // Giriş anında kontrolü aktif et
+                    verileriCek(true);
                 } else alert("Hatalı giriş!");
             });
         } else {
             db.collection("sistem_kullanicilari").doc(uId).set({password: pass, email: email}).then(() => {
-                alert("Kayıt Başarılı! Şimdi giriş yapabilirsiniz.");
+                alert("Kayıt Başarılı!");
                 modDegis();
             });
         }
@@ -139,10 +157,10 @@
 
     function sifreHatirlat() {
         const email = document.getElementById('log-email').value.trim().toLowerCase();
-        if(!email) return alert("E-posta adresinizi yazın!");
+        if(!email) return alert("E-posta yazın!");
         db.collection("sistem_kullanicilari").doc(email.replace(/\./g, "_")).get().then(doc => {
             if(doc.exists) alert("Şifreniz: " + doc.data().password);
-            else alert("Bu e-posta ile kayıt bulunamadı!");
+            else alert("Bulunamadı!");
         });
     }
 
@@ -161,12 +179,12 @@
         document.querySelectorAll('#g-list .row-item').forEach(r => {
             const ad = r.querySelector('.in-ad').value;
             const tu = r.querySelector('.in-tu').value;
-            if(ad || tu) gids.push({ad: ad, tu: tu, gu: r.querySelector('.in-gu').value, od: r.querySelector('.in-od').checked});
+            if(ad || tu) gids.push({ad, tu, gu: r.querySelector('.in-gu').value, od: r.querySelector('.in-od').checked});
         });
         document.querySelectorAll('#gel-list .row-item').forEach(r => {
             const ad = r.querySelector('.in-ad').value;
             const tu = r.querySelector('.in-tu').value;
-            if(ad || tu) gels.push({ad: ad, tu: tu});
+            if(ad || tu) gels.push({ad, tu});
         });
         db.collection("kullanici_verileri").doc(aktifId).collection("donemler").doc(donem).set({giderler:gids, gelirler:gels}).then(hesapla);
     }
@@ -178,7 +196,7 @@
         items.forEach(item => container.appendChild(item));
     }
 
-    function verileriCek(uyariVerilsinMi = false) {
+    function verileriCek(uyari = false) {
         const donem = document.getElementById('y-sel').value + "_" + document.getElementById('m-sel').value;
         db.collection("kullanici_verileri").doc(aktifId).collection("donemler").doc(donem).get().then(doc => {
             document.getElementById('g-list').innerHTML = "";
@@ -188,16 +206,11 @@
                 if(d.giderler) {
                     d.giderler.sort((a,b)=>(parseInt(a.gu)||99)-(parseInt(b.gu)||99));
                     d.giderler.forEach(x => satirBas('gider', x));
-                    
-                    // Bildirim Kontrolü
-                    if(uyariVerilsinMi) {
+                    if(uyari) {
                         setTimeout(() => {
                             const bugun = new Date().getDate();
                             const gecenler = d.giderler.filter(x => x.gu && parseInt(x.gu) < bugun && !x.od && x.ad);
-                            if(gecenler.length > 0) {
-                                const isimler = gecenler.map(x => x.ad).join(", ");
-                                alert("⚠️ ÖDEMESİ GEÇENLER VAR:\n\n" + isimler);
-                            }
+                            if(gecenler.length > 0) alert("⚠️ ÖDEMESİ GEÇENLER:\n" + gecenler.map(x => x.ad).join(", "));
                         }, 1000);
                     }
                 }
@@ -222,6 +235,28 @@
 
     function satirEkle(tip) { satirBas(tip); verileriKaydet(); }
     function satirSil(id) { if(confirm("Silmek istiyor musunuz?")) { document.getElementById(id).remove(); verileriKaydet(); } }
+
+    function gecenAyiKopyala() {
+        if(!confirm("Geçen ayın gider ve gelirlerini bu aya kopyalamak istediğine emin misin?")) return;
+        let m = parseInt(document.getElementById('m-sel').value);
+        let y = parseInt(document.getElementById('y-sel').value);
+        if(m === 0) { m = 11; y--; } else { m--; }
+        const gecenDonem = y + "_" + m;
+        
+        db.collection("kullanici_verileri").doc(aktifId).collection("donemler").doc(gecenDonem).get().then(doc => {
+            if(doc.exists) {
+                const d = doc.data();
+                // Mevcut ayı temizleme (Opsiyonel: Üzerine eklemesini istiyorsan bu kısmı silebilirsin)
+                document.getElementById('g-list').innerHTML = "";
+                document.getElementById('gel-list').innerHTML = "";
+                
+                if(d.giderler) d.giderler.forEach(x => satirBas('gider', {...x, od: false})); // Kopyalarken 'Ödendi' işaretini kaldırır
+                if(d.gelirler) d.gelirler.forEach(x => satirBas('gelir', x));
+                verileriKaydet();
+                alert("Veriler başarıyla aktarıldı!");
+            } else alert("Geçen aya ait veri bulunamadı.");
+        });
+    }
 
     function taksitCheck(id, tip) {
         if(tip !== 'gider') return verileriKaydet();
@@ -256,9 +291,22 @@
             tg += v; if(r.querySelector('.in-od').checked) tod += v;
         });
         document.querySelectorAll('#gel-list .row-item').forEach(r => tgel += parseFloat(r.querySelector('.in-tu').value)||0);
+        
         document.getElementById('res-tg').innerText = tg.toLocaleString('tr-TR') + " TL";
         document.getElementById('res-tgel').innerText = tgel.toLocaleString('tr-TR') + " TL";
         document.getElementById('res-kalan').innerText = (tg-tod).toLocaleString('tr-TR') + " TL";
+
+        // Progress Bar Güncelleme
+        const bar = document.getElementById('progress-bar');
+        const percLabel = document.getElementById('progress-percent');
+        let oran = tgel > 0 ? (tg / tgel) * 100 : 0;
+        if(oran > 100) oran = 100;
+        bar.style.width = oran + "%";
+        percLabel.innerText = "%" + Math.round(oran);
+        
+        if(oran < 70) bar.style.background = "var(--success)";
+        else if(oran < 90) bar.style.background = "var(--warning)";
+        else bar.style.background = "var(--danger)";
     }
 </script>
 </body>
