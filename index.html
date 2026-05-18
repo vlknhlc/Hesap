@@ -3,81 +3,112 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Bütçe Takip</title>
+    <title>Bütçe Takip Pro v7</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
     <style>
-        :root { --p: #2c3e50; --a: #3498db; --d: #e74c3c; --s: #27ae60; }
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; font-size: 14px; }
-        body { background: #f4f4f4; }
-        
-        /* GİRİŞ EKRANI */
-        #login-screen { position: fixed; inset: 0; background: var(--p); display: flex; align-items: center; justify-content: center; z-index: 9999; }
-        .login-box { background: white; padding: 30px; border-radius: 10px; width: 90%; max-width: 320px; text-align: center; }
-        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; -webkit-appearance: none; }
-        .btn { width: 100%; padding: 12px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; background: var(--a); color: white; display: block; }
-        .link { color: var(--a); text-decoration: underline; margin-top: 15px; display: inline-block; cursor: pointer; font-size: 12px; }
+        :root { 
+            --primary: #2c3e50; --accent: #3498db; --danger: #e74c3c; --success: #27ae60;
+            --bg: #f4f7f6; --row-bg: #ffffff; --border: #dfe6e9;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: var(--bg); color: #2d3436; padding: 10px; }
 
-        /* UYGULAMA */
-        #app-content { display: none; max-width: 500px; margin: 0 auto; background: white; min-height: 100vh; border: 1px solid #ddd; }
-        .nav { background: var(--p); color: white; padding: 10px; display: flex; justify-content: space-between; align-items: center; }
-        select { padding: 5px; border-radius: 4px; }
+        /* Giriş Ekranı */
+        #login-screen { position: fixed; inset: 0; background: linear-gradient(135deg, var(--primary), #1e272e); display: flex; align-items: center; justify-content: center; z-index: 9999; }
+        .login-box { background: white; padding: 35px; border-radius: 15px; width: 90%; max-width: 350px; text-align: center; box-shadow: 0 15px 35px rgba(0,0,0,0.4); }
+        .login-box input { width: 100%; padding: 14px; margin: 10px 0; border: 2px solid #eee; border-radius: 8px; font-size: 16px; outline: none; transition: 0.3s; }
+        .login-box input:focus { border-color: var(--accent); }
+        .btn-log { width: 100%; padding: 14px; background: var(--accent); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 16px; margin-top: 10px; }
 
-        /* TABLO */
-        .row { display: grid; border-bottom: 1px solid #eee; align-items: center; min-height: 45px; }
-        .g-row { grid-template-columns: 1fr 80px 45px 35px 35px; }
-        .gel-row { grid-template-columns: 1fr 100px 35px; }
-        .head { background: #f8f9fa; font-weight: bold; font-size: 11px; text-align: center; color: #666; }
-        .cell { padding: 5px; border-right: 1px solid #f0f0f0; display: flex; align-items: center; }
-        .table-input { border: none !important; margin: 0 !important; background: transparent !important; }
+        /* Ana Uygulama */
+        #app-content { display: none; max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 5px 20px rgba(0,0,0,0.1); border: 1px solid var(--border); }
+        .nav { background: var(--primary); color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center; }
+        .nav select { padding: 6px 10px; border-radius: 6px; border: none; font-weight: bold; background: #ecf0f1; cursor: pointer; font-size: 14px; }
+
+        /* Tablo Yapısı */
+        .section-header { background: #f8f9fa; padding: 12px; font-weight: 800; border-bottom: 2px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .row { display: grid; border-bottom: 1px solid var(--border); align-items: center; min-height: 50px; background: var(--row-bg); transition: 0.2s; }
+        .row:hover { background: #fdfdfd; }
         
-        .section-h { background: #eee; padding: 8px; font-weight: bold; color: var(--p); border-bottom: 1px solid #ddd; }
-        .summary { padding: 15px; }
-        .summary div { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0; }
+        /* Gider sütunları: Açıklama | Tutar | Gün | Ödendi mi | Sil */
+        .g-row { grid-template-columns: 1fr 90px 60px 45px 40px; }
+        .gel-row { grid-template-columns: 1fr 110px 40px; }
+        
+        .head-cell { font-size: 11px; color: #636e72; text-transform: uppercase; text-align: center; padding: 5px; font-weight: bold; }
+        .cell { padding: 5px; border-right: 1px solid #f1f2f6; display: flex; align-items: center; height: 100%; }
+        .cell:last-child { border-right: none; }
+
+        /* Inputlar */
+        .table-input { width: 100%; border: none !important; padding: 8px 5px; background: transparent; font-size: 14px; color: #2d3436; outline: none; }
+        .table-input::placeholder { color: #b2bec3; font-style: italic; font-size: 12px; }
+        .in-tu { font-weight: bold; text-align: right; color: #2c3e50; }
+        .in-gu { font-weight: bold; text-align: center; color: var(--accent); font-size: 15px; } /* Gün kısmı büyütüldü */
+
+        input[type="checkbox"] { width: 22px; height: 22px; cursor: pointer; accent-color: var(--success); }
+        .del-btn { background: none; border: none; color: #fab1a0; font-size: 24px; cursor: pointer; width: 100%; transition: 0.2s; }
+        .del-btn:hover { color: var(--danger); }
+
+        /* Özetler */
+        .btn-add { width: 100%; padding: 15px; border: none; background: #fff; color: var(--accent); font-weight: bold; cursor: pointer; font-size: 15px; border-bottom: 1px solid var(--border); }
+        .btn-add:hover { background: #f1f2f6; }
+        
+        .summary { padding: 20px; background: #f8f9fa; }
+        .sum-line { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #dfe6e9; font-size: 15px; }
+        .sum-line.total { border-bottom: none; font-size: 18px; font-weight: 800; color: var(--danger); margin-top: 10px; }
+        
+        .link-sub { color: var(--accent); font-size: 12px; cursor: pointer; text-decoration: underline; display: block; margin-top: 10px; }
     </style>
 </head>
 <body>
 
 <div id="login-screen">
     <div class="login-box">
-        <h2 id="log-title" style="margin-bottom:10px;">Bütçe Giriş</h2>
-        <input type="text" id="log-email" placeholder="E-posta">
-        <input type="password" id="log-pass" placeholder="Şifre">
-        <button class="btn" onclick="authHareketi()" id="log-btn">GİRİŞ YAP</button>
-        <div class="link" onclick="modDegis()" id="log-link">Hesap Oluştur</div>
-        <div class="link" onclick="sifreHatirlat()" style="color:#999; margin-left:10px;">Şifremi Unuttum</div>
+        <h2 id="log-title" style="margin-bottom:15px; color: var(--primary);">Bütçe Takip</h2>
+        <input type="email" id="log-email" placeholder="E-posta Adresiniz">
+        <input type="password" id="log-pass" placeholder="Şifreniz">
+        <button class="btn-log" onclick="authHareketi()" id="log-btn">GİRİŞ YAP</button>
+        <span class="link-sub" onclick="modDegis()" id="log-link">Yeni Hesap Oluştur</span>
+        <span class="link-sub" onclick="sifreHatirlat()" style="color:#999; text-decoration: none;">Şifremi Unuttum?</span>
     </div>
 </div>
 
 <div id="app-content">
     <div class="nav">
-        <span id="user-display" style="font-size:10px;">...</span>
+        <span id="user-display" style="font-size:11px; opacity:0.8;">...</span>
         <div>
             <select id="y-sel" onchange="verileriCek()"></select>
             <select id="m-sel" onchange="verileriCek()"></select>
         </div>
-        <button onclick="location.reload()" style="background:var(--d); color:white; border:none; padding:4px 8px; border-radius:4px;">Çıkış</button>
+        <button onclick="location.reload()" style="background:rgba(255,255,255,0.2); color:white; border:none; padding:5px 10px; border-radius:5px; font-size:11px;">Çıkış</button>
     </div>
 
-    <div class="section-h" style="color:var(--d)">GİDERLER</div>
-    <div class="row g-row head"><div>AÇIKLAMA</div><div>TUTAR</div><div>GÜN</div><div>OK</div><div></div></div>
+    <div class="section-header" style="color:var(--danger)">
+        <span>📉 GİDERLER (NAKİT)</span>
+    </div>
+    <div class="row g-row" style="background:#f1f2f6; min-height: 30px;">
+        <div class="head-cell">AÇIKLAMA</div><div class="head-cell">TUTAR</div><div class="head-cell">GÜN</div><div class="head-cell">OK</div><div class="head-cell"></div>
+    </div>
     <div id="g-list"></div>
-    <button onclick="satirEkle('gider')" style="width:100%; padding:10px; background:none; border:none; color:var(--a); font-weight:bold;">+ Gider Ekle</button>
+    <button class="btn-add" onclick="satirEkle('gider')">+ Yeni Gider Satırı Ekle</button>
 
-    <div class="section-h" style="color:var(--s); margin-top:10px;">GELİRLER</div>
-    <div class="row gel-row head"><div>GELİR KAYNAĞI</div><div>TUTAR</div><div></div></div>
+    <div class="section-header" style="color:var(--success); margin-top:15px;">
+        <span>📈 GELİRLER</span>
+    </div>
+    <div class="row gel-row" style="background:#f1f2f6; min-height: 30px;">
+        <div class="head-cell">GELİR KAYNAĞI</div><div class="head-cell">TUTAR</div><div class="head-cell"></div>
+    </div>
     <div id="gel-list"></div>
-    <button onclick="satirEkle('gelir')" style="width:100%; padding:10px; background:none; border:none; color:var(--s); font-weight:bold;">+ Gelir Ekle</button>
+    <button class="btn-add" onclick="satirEkle('gelir')">+ Yeni Gelir Satırı Ekle</button>
 
     <div class="summary">
-        <div><span>Toplam Gider:</span> <span id="res-tg">0 TL</span></div>
-        <div><span>Toplam Gelir:</span> <span id="res-tgel">0 TL</span></div>
-        <div style="font-weight:bold; color:var(--d); font-size:16px;"><span>KALAN ÖDEME:</span> <span id="res-kalan">0 TL</span></div>
+        <div class="sum-line"><span>Toplam Gider:</span> <span id="res-tg">0 TL</span></div>
+        <div class="sum-line"><span>Toplam Gelir:</span> <span id="res-tgel">0 TL</span></div>
+        <div class="sum-line total"><span>ÖDENECEK KALAN:</span> <span id="res-kalan">0 TL</span></div>
     </div>
 </div>
 
 <script>
-    // Firebase Başlatma
     const config = {
         apiKey: "AIzaSyB2AtnX-D7Wv1_ONCc3nhOrQgAK4RWWPiE",
         authDomain: "butcetakip-1addc.firebaseapp.com",
@@ -88,7 +119,6 @@
     };
     firebase.initializeApp(config);
     const db = firebase.firestore();
-    
     let isLogMode = true;
     let aktifId = "";
 
@@ -96,13 +126,13 @@
         isLogMode = !isLogMode;
         document.getElementById('log-title').innerText = isLogMode ? "Bütçe Giriş" : "Yeni Kayıt";
         document.getElementById('log-btn').innerText = isLogMode ? "GİRİŞ YAP" : "KAYIT OL";
-        document.getElementById('log-link').innerText = isLogMode ? "Hesap Oluştur" : "Zaten Hesabım Var";
+        document.getElementById('log-link').innerText = isLogMode ? "Yeni Hesap Oluştur" : "Zaten Hesabım Var";
     }
 
     function authHareketi() {
         const email = document.getElementById('log-email').value.trim().toLowerCase();
         const pass = document.getElementById('log-pass').value;
-        if(!email || !pass) { alert("Doldurun!"); return; }
+        if(!email || !pass) { alert("Lütfen bilgileri girin!"); return; }
         const uId = email.replace(/\./g, "_");
 
         if(isLogMode) {
@@ -113,20 +143,20 @@
                     document.getElementById('login-screen').style.display = 'none';
                     document.getElementById('app-content').style.display = 'block';
                     verileriCek(true);
-                } else { alert("Hatalı giriş!"); }
-            }).catch(e => alert("Bağlantı Hatası: " + e.message));
+                } else { alert("E-posta veya şifre hatalı!"); }
+            }).catch(e => alert("Bağlantı Hatası!"));
         } else {
             db.collection("sistem_kullanicilari").doc(uId).set({password: pass, email: email})
-            .then(() => { alert("Kaydedildi! Giriş yapın."); modDegis(); });
+            .then(() => { alert("Kaydınız oluşturuldu! Şimdi giriş yapabilirsiniz."); modDegis(); });
         }
     }
 
     function sifreHatirlat() {
         const email = document.getElementById('log-email').value.trim().toLowerCase();
-        if(!email) return alert("E-posta yazın!");
+        if(!email) return alert("E-posta adresinizi yazın!");
         db.collection("sistem_kullanicilari").doc(email.replace(/\./g, "_")).get().then(doc => {
             if(doc.exists) alert("Şifreniz: " + doc.data().password);
-            else alert("Bulunamadı!");
+            else alert("Bu e-posta ile kayıt bulunamadı!");
         });
     }
 
@@ -142,15 +172,19 @@
         const donem = document.getElementById('y-sel').value + "_" + document.getElementById('m-sel').value;
         const gids = [], gels = [];
         document.querySelectorAll('#g-list .row-item').forEach(r => {
-            gids.push({ad: r.querySelector('.in-ad').value, tu: r.querySelector('.in-tu').value, gu: r.querySelector('.in-gu').value, od: r.querySelector('.in-od').checked});
+            const ad = r.querySelector('.in-ad').value;
+            const tu = r.querySelector('.in-tu').value;
+            if(ad || tu) gids.push({ad: ad, tu: tu, gu: r.querySelector('.in-gu').value, od: r.querySelector('.in-od').checked});
         });
         document.querySelectorAll('#gel-list .row-item').forEach(r => {
-            gels.push({ad: r.querySelector('.in-ad').value, tu: r.querySelector('.in-tu').value});
+            const ad = r.querySelector('.in-ad').value;
+            const tu = r.querySelector('.in-tu').value;
+            if(ad || tu) gels.push({ad: ad, tu: tu});
         });
         db.collection("kullanici_verileri").doc(aktifId).collection("donemler").doc(donem).set({giderler:gids, gelirler:gels}).then(hesapla);
     }
 
-    function verileriCek(alertVar = false) {
+    function verileriCek(uyariVer = false) {
         const donem = document.getElementById('y-sel').value + "_" + document.getElementById('m-sel').value;
         db.collection("kullanici_verileri").doc(aktifId).collection("donemler").doc(donem).get().then(doc => {
             document.getElementById('g-list').innerHTML = "";
@@ -160,14 +194,15 @@
                 if(d.giderler) {
                     d.giderler.sort((a,b)=>(parseInt(a.gu)||99)-(parseInt(b.gu)||99));
                     d.giderler.forEach(x => satirBas('gider', x));
-                    if(alertVar) {
+                    if(uyariVer) {
                         const bugun = new Date().getDate();
                         const gecen = d.giderler.filter(x => parseInt(x.gu) < bugun && !x.od && x.ad).map(x => x.ad);
-                        if(gecen.length > 0) alert("⚠️ Gecikenler: " + gecen.join(", "));
+                        if(gecen.length > 0) alert("⚠️ Ödemesi Geçenler var: " + gecen.join(", "));
                     }
                 }
                 if(d.gelirler) d.gelirler.forEach(x => satirBas('gelir', x));
             }
+            if(document.querySelectorAll('.row-item').length === 0) satirEkle('gider');
             hesapla();
         });
     }
@@ -178,46 +213,49 @@
         const grid = tip === 'gider' ? 'g-row' : 'gel-row';
         
         let html = `<div class="row ${grid} row-item" id="${id}">
-            <div class="cell"><input type="text" class="table-input in-ad" value="${v.ad}" onchange="taksitCheck('${id}','${tip}')"></div>
-            <div class="cell"><input type="number" class="table-input in-tu" value="${v.tu}" onchange="verileriKaydet()"></div>`;
+            <div class="cell"><input type="text" class="table-input in-ad" value="${v.ad}" placeholder="${tip==='gider'?'Market, Kira vb.':'Maaş, Ek Gelir'}" onchange="taksitCheck('${id}','${tip}')"></div>
+            <div class="cell"><input type="number" class="table-input in-tu" value="${v.tu}" placeholder="0" onchange="verileriKaydet()"></div>`;
         
         if(tip === 'gider') {
-            html += `<div class="cell"><input type="number" class="table-input in-gu" value="${v.gu}" onchange="verileriKaydet()"></div>
+            html += `<div class="cell"><input type="number" class="table-input in-gu" value="${v.gu}" placeholder="Gün" onchange="verileriKaydet()"></div>
                      <div class="cell" style="justify-content:center"><input type="checkbox" class="in-od" ${v.od?'checked':''} onchange="verileriKaydet()"></div>`;
         }
         
-        html += `<div class="cell"><button style="border:none; background:none; color:#ccc;" onclick="satirSil('${id}')">×</button></div></div>`;
+        html += `<div class="cell"><button class="del-btn" onclick="satirSil('${id}')">×</button></div></div>`;
         document.getElementById(target).insertAdjacentHTML('beforeend', html);
     }
 
     function satirEkle(tip) { satirBas(tip); verileriKaydet(); }
-    function satirSil(id) { if(confirm("Silinsin mi?")) { document.getElementById(id).remove(); verileriKaydet(); } }
+    function satirSil(id) { if(confirm("Bu satırı silmek istediğinize emin misiniz?")) { document.getElementById(id).remove(); verileriKaydet(); } }
 
     function taksitCheck(id, tip) {
         if(tip !== 'gider') return verileriKaydet();
         const r = document.getElementById(id);
         const ad = r.querySelector('.in-ad').value;
-        if(!ad || ad.includes('/')) return verileriKaydet();
+        if(!ad || ad.includes('/') || ad.length < 2) return verileriKaydet();
         
-        if(confirm("Taksitli mi?")) {
-            const n = parseInt(prompt("Kaç taksit?"));
-            if(n > 1) {
-                const tu = r.querySelector('.in-tu').value, gu = r.querySelector('.in-gu').value;
-                const sy = parseInt(document.getElementById('y-sel').value), sm = parseInt(document.getElementById('m-sel').value);
-                for(let i=0; i<n; i++) {
-                    let m = sm+i, y = sy; if(m>11) { y += Math.floor(m/12); m = m%12; }
-                    const dk = `${y}_${m}`, ta = `${ad} (${i+1}/${n})`;
-                    db.collection("kullanici_verileri").doc(aktifId).collection("donemler").doc(dk).get().then(doc => {
-                        let gs = doc.exists ? (doc.data().giderler || []) : [];
-                        if(!gs.some(x => x.ad === ta)) {
-                            gs.push({ad:ta, tu, gu, od:false});
-                            db.collection("kullanici_verileri").doc(aktifId).collection("donemler").doc(dk).set({giderler:gs, gelirler:(doc.exists?doc.data().gelirler:[])});
-                        }
-                    });
+        setTimeout(() => {
+            if(confirm(`"${ad}" harcamasını taksitlendirmek ister misiniz?`)) {
+                const n = parseInt(prompt("Kaç ay taksit yapılsın? (Örn: 6)"));
+                if(n > 1) {
+                    const tu = r.querySelector('.in-tu').value, gu = r.querySelector('.in-gu').value;
+                    const sy = parseInt(document.getElementById('y-sel').value), sm = parseInt(document.getElementById('m-sel').value);
+                    for(let i=0; i<n; i++) {
+                        let m = sm+i, y = sy; if(m>11) { y += Math.floor(m/12); m = m%12; }
+                        const dk = `${y}_${m}`, ta = `${ad} (${i+1}/${n})`;
+                        db.collection("kullanici_verileri").doc(aktifId).collection("donemler").doc(dk).get().then(doc => {
+                            let gs = doc.exists ? (doc.data().giderler || []) : [];
+                            if(!gs.some(x => x.ad === ta)) {
+                                gs.push({ad:ta, tu, gu, od:false});
+                                db.collection("kullanici_verileri").doc(aktifId).collection("donemler").doc(dk).set({giderler:gs, gelirler:(doc.exists?doc.data().gelirler:[])});
+                            }
+                        });
+                    }
+                    alert("Taksitler gelecek aylara eklendi.");
+                    setTimeout(verileriCek, 1200);
                 }
-                setTimeout(verileriCek, 1000);
-            }
-        } else verileriKaydet();
+            } else verileriKaydet();
+        }, 300);
     }
 
     function hesapla() {
@@ -227,9 +265,9 @@
             tg += v; if(r.querySelector('.in-od').checked) tod += v;
         });
         document.querySelectorAll('#gel-list .row-item').forEach(r => tgel += parseFloat(r.querySelector('.in-tu').value)||0);
-        document.getElementById('res-tg').innerText = tg.toLocaleString() + " TL";
-        document.getElementById('res-tgel').innerText = tgel.toLocaleString() + " TL";
-        document.getElementById('res-kalan').innerText = (tg-tod).toLocaleString() + " TL";
+        document.getElementById('res-tg').innerText = tg.toLocaleString('tr-TR') + " TL";
+        document.getElementById('res-tgel').innerText = tgel.toLocaleString('tr-TR') + " TL";
+        document.getElementById('res-kalan').innerText = (tg-tod).toLocaleString('tr-TR') + " TL";
     }
 </script>
 </body>
