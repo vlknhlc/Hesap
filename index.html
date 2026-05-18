@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Bütçe Takip Pro v9</title>
+    <title>Bütçe Takip Pro v10</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
     <style>
@@ -126,7 +126,7 @@
                     document.getElementById('user-display').innerText = email;
                     document.getElementById('login-screen').style.display = 'none';
                     document.getElementById('app-content').style.display = 'block';
-                    verileriCek(true);
+                    verileriCek(true); // Giriş anında kontrolü aktif et
                 } else alert("Hatalı giriş!");
             });
         } else {
@@ -178,7 +178,7 @@
         items.forEach(item => container.appendChild(item));
     }
 
-    function verileriCek(uyari = false) {
+    function verileriCek(uyariVerilsinMi = false) {
         const donem = document.getElementById('y-sel').value + "_" + document.getElementById('m-sel').value;
         db.collection("kullanici_verileri").doc(aktifId).collection("donemler").doc(donem).get().then(doc => {
             document.getElementById('g-list').innerHTML = "";
@@ -188,6 +188,18 @@
                 if(d.giderler) {
                     d.giderler.sort((a,b)=>(parseInt(a.gu)||99)-(parseInt(b.gu)||99));
                     d.giderler.forEach(x => satirBas('gider', x));
+                    
+                    // Bildirim Kontrolü
+                    if(uyariVerilsinMi) {
+                        setTimeout(() => {
+                            const bugun = new Date().getDate();
+                            const gecenler = d.giderler.filter(x => x.gu && parseInt(x.gu) < bugun && !x.od && x.ad);
+                            if(gecenler.length > 0) {
+                                const isimler = gecenler.map(x => x.ad).join(", ");
+                                alert("⚠️ ÖDEMESİ GEÇENLER VAR:\n\n" + isimler);
+                            }
+                        }, 1000);
+                    }
                 }
                 if(d.gelirler) d.gelirler.forEach(x => satirBas('gelir', x));
             }
