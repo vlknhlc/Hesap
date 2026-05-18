@@ -2,57 +2,51 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-    <title>Bütçe Pro v3</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Bütçe Pro v4 - Akıllı Takip</title>
     <style>
-        :root { --bg: #ffffff; --border: #dee2e6; --header-bg: #f8f9fa; --danger: #dc3545; --success: #28a745; }
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; font-size: 13px; }
-        body { background: #e9ecef; color: #212529; padding: 5px; }
+        :root { --bg: #f4f7f6; --border: #e0e0e0; --primary: #2c3e50; --success: #27ae60; --danger: #e74c3c; --accent: #3498db; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; font-size: 13px; }
+        body { background: var(--bg); color: #333; padding: 5px; }
 
-        /* Giriş Paneli */
-        #login-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #2c3e50; display: flex; align-items: center; justify-content: center; z-index: 2000; }
-        .login-card { background: white; padding: 20px; border-radius: 8px; width: 90%; max-width: 300px; text-align: center; }
-        .login-card input { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ccc; border-radius: 4px; }
-        
-        #app-content { display: none; max-width: 500px; margin: 0 auto; background: white; border: 1px solid var(--border); box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        /* Giriş Ekranı */
+        #login-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--primary); display: flex; align-items: center; justify-content: center; z-index: 2000; }
+        .login-card { background: white; padding: 25px; border-radius: 12px; width: 90%; max-width: 320px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+        .login-card h2 { font-size: 20px; margin-bottom: 15px; color: var(--primary); }
+        .login-card input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 6px; font-size: 15px; }
+        .auth-btn { width: 100%; padding: 12px; background: var(--accent); color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        .auth-link { display: block; margin-top: 12px; color: var(--accent); text-decoration: none; cursor: pointer; font-size: 12px; }
 
-        /* Üst Menü */
-        .top-nav { background: #343a40; color: white; padding: 10px; display: flex; justify-content: space-between; align-items: center; }
-        .selectors select { padding: 4px; border-radius: 3px; font-weight: bold; }
+        /* Uygulama Ana Yapı */
+        #app-content { display: none; max-width: 500px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .top-nav { background: var(--primary); color: white; padding: 10px; display: flex; justify-content: space-between; align-items: center; }
+        .top-nav select { padding: 4px 8px; border-radius: 4px; background: white; border: none; font-weight: bold; }
 
-        /* Tablo Yapısı */
-        .excel-table { width: 100%; display: grid; border-bottom: 1px solid var(--border); }
-        .row { display: grid; border-bottom: 1px solid var(--border); align-items: center; }
-        .row:last-child { border-bottom: none; }
-        
-        /* Gider Grid: Açıklama(1fr), Tutar(80px), Gün(40px), Ödendi(30px), Sil(30px) */
-        .gider-row { grid-template-columns: 1fr 90px 45px 35px 30px; }
+        /* Excel Tablo Görünümü */
+        .excel-table { width: 100%; display: grid; }
+        .row { display: grid; border-bottom: 1px solid var(--border); align-items: center; min-height: 40px; }
+        .gider-row { grid-template-columns: 1fr 85px 45px 35px 35px; }
         .gelir-row { grid-template-columns: 1fr 100px 35px; }
         
-        .cell { padding: 6px 4px; border-right: 1px solid var(--border); height: 100%; display: flex; align-items: center; }
+        .cell { padding: 4px; border-right: 1px solid var(--border); height: 100%; display: flex; align-items: center; overflow: hidden; }
         .cell:last-child { border-right: none; }
-        .header-cell { background: var(--header-bg); font-weight: bold; text-align: center; justify-content: center; font-size: 11px; text-transform: uppercase; }
+        .header-cell { background: #f8f9fa; font-weight: bold; font-size: 11px; color: #666; justify-content: center; }
 
-        input { width: 100%; border: none; background: transparent; padding: 2px; }
-        input:focus { background: #fffde7; outline: none; }
-        input[type="number"] { text-align: right; }
-        input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
+        input { width: 100%; border: none; background: transparent; padding: 5px; height: 100%; }
+        input:focus { background: #eef6ff; outline: none; }
+        input[type="number"] { text-align: center; }
+        input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--success); }
 
-        /* Başlıklar */
-        .section-title { background: #ff0000; color: white; padding: 5px 10px; font-weight: bold; text-align: center; }
-        .gelir-title { background: #28a745; }
+        /* Başlıklar ve Özetler */
+        .section-bar { background: #eee; padding: 6px 10px; font-weight: bold; display: flex; justify-content: space-between; }
+        .sum-box { padding: 15px; background: #fff; border-top: 2px solid #ddd; }
+        .line { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0; }
+        .line.bold { font-weight: 800; font-size: 15px; border-bottom: none; padding-top: 12px; }
 
-        /* Özet Kutuları */
-        .summary-panel { padding: 10px; background: #fff; }
-        .box { padding: 10px; margin-bottom: 5px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; font-weight: bold; }
-        .box-red { background: #ffcccc; color: #900; }
-        .box-green { background: #ccffcc; color: #060; }
-        .box-blue { background: #cce5ff; color: #004085; }
-
-        .btn-add { width: 100%; padding: 10px; background: #f8f9fa; border: none; border-bottom: 1px solid var(--border); color: #007bff; font-weight: bold; cursor: pointer; }
-        .btn-del { color: #ccc; border: none; background: none; font-size: 16px; width: 100%; cursor: pointer; }
-        .btn-del:hover { color: red; }
+        .btn-add { width: 100%; padding: 12px; background: #fff; border: none; border-bottom: 1px solid var(--border); color: var(--accent); font-weight: bold; cursor: pointer; }
+        .del-btn { color: #ccc; border: none; background: none; font-size: 18px; width: 100%; cursor: pointer; }
     </style>
+
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 </head>
@@ -60,36 +54,40 @@
 
 <div id="login-screen">
     <div class="login-card">
-        <h3>BÜTÇE GİRİŞ</h3>
+        <h2 id="auth-title">Bütçe Giriş</h2>
         <input type="text" id="email" placeholder="E-posta">
-        <input type="password" id="password" placeholder="Şifre" onkeydown="if(event.key==='Enter') login()">
-        <button onclick="login()" style="width:100%; padding:10px; margin-top:10px; background:#007bff; color:white; border:none; border-radius:4px;">GİRİŞ</button>
+        <input type="password" id="password" placeholder="Şifre" onkeydown="if(event.key==='Enter') authIslemi()">
+        <button class="auth-btn" id="main-btn" onclick="authIslemi()">GİRİŞ YAP</button>
+        <span class="auth-link" id="toggle-link" onclick="toggleMode()">Yeni Hesap Oluştur</span>
+        <span class="auth-link" style="margin-top:5px; color:#999;" onclick="sifremiUnuttum()">Şifremi Unuttum</span>
+        <p id="err" style="color:red; font-size:11px; margin-top:10px; display:none;"></p>
     </div>
 </div>
 
 <div id="app-content">
     <div class="top-nav">
-        <div class="selectors">
+        <div id="user-label" style="font-size:11px; opacity:0.8;">...</div>
+        <div>
             <select id="select-year" onchange="verileriYukle()"></select>
             <select id="select-month" onchange="verileriYukle()"></select>
         </div>
-        <button onclick="location.reload()" style="background:none; border:none; color:white; font-size:11px;">Çıkış</button>
+        <button onclick="location.reload()" style="background:none; border:none; color:white; font-size:11px; cursor:pointer;">Çıkış</button>
     </div>
 
-    <div class="section-title">GİDERLER (NAKİT)</div>
+    <div class="section-bar" style="color:var(--danger)"><span>GİDERLER (NAKİT)</span></div>
     <div class="excel-table">
         <div class="row gider-row">
             <div class="cell header-cell">AÇIKLAMA</div>
             <div class="cell header-cell">TUTAR</div>
             <div class="cell header-cell">GÜN</div>
-            <div class="cell header-cell">✅</div>
+            <div class="cell header-cell">OK</div>
             <div class="cell header-cell"></div>
         </div>
         <div id="giderBody"></div>
     </div>
-    <button class="btn-add" onclick="giderEkle('','','',false,true)">+ Yeni Gider Satırı</button>
+    <button class="btn-add" onclick="giderSatiriEkle('','','',false,true)">+ Yeni Gider Ekle</button>
 
-    <div class="section-title gelir-title">GELİRLER</div>
+    <div class="section-bar" style="color:var(--success); margin-top:10px;"><span>GELİRLER</span></div>
     <div class="excel-table">
         <div class="row gelir-row">
             <div class="cell header-cell">GELİR KAYNAĞI</div>
@@ -98,13 +96,13 @@
         </div>
         <div id="gelirBody"></div>
     </div>
-    <button class="btn-add" onclick="gelirEkle('','',true)">+ Yeni Gelir Satırı</button>
+    <button class="btn-add" onclick="gelirSatiriEkle('','',true)">+ Yeni Gelir Ekle</button>
 
-    <div class="summary-panel">
-        <div class="box box-blue"><span>TOPLAM GİDER:</span> <span id="toplamGider">0 TL</span></div>
-        <div class="box box-green"><span>TOPLAM GELİR:</span> <span id="toplamGelir">0 TL</span></div>
-        <div id="dengeBox" class="box"><span>DENGE (KALAN):</span> <span id="denge">0 TL</span></div>
-        <div class="box box-red" style="font-size: 14px; border: 2px solid red;"><span>ÖDENECEK KALAN:</span> <span id="kalanOdeme">0 TL</span></div>
+    <div class="sum-box">
+        <div class="line"><span>Toplam Gider:</span> <span id="tg">0 TL</span></div>
+        <div class="line"><span>Toplam Gelir:</span> <span id="tgel">0 TL</span></div>
+        <div class="line" id="dengeLine"><span>Denge:</span> <span id="denge">0 TL</span></div>
+        <div class="line bold" style="color:var(--danger); border-top: 1px dashed #ccc;"><span>ÖDENECEK KALAN:</span> <span id="kalan">0 TL</span></div>
     </div>
 </div>
 
@@ -119,29 +117,62 @@
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
+    
+    let isLogin = true;
     let aktifUser = "";
+
+    function toggleMode() {
+        isLogin = !isLogin;
+        document.getElementById('auth-title').innerText = isLogin ? "Bütçe Giriş" : "Yeni Kayıt";
+        document.getElementById('main-btn').innerText = isLogin ? "GİRİŞ YAP" : "KAYIT OL";
+        document.getElementById('toggle-link').innerText = isLogin ? "Yeni Hesap Oluştur" : "Zaten Hesabım Var";
+    }
+
+    function authIslemi() {
+        const email = document.getElementById('email').value.trim().toLowerCase();
+        const pass = document.getElementById('password').value;
+        const docN = email.replace(/\./g, "_");
+        if(!email || !pass) return;
+
+        if(isLogin) {
+            db.collection("sistem_kullanicilari").doc(docN).get().then(doc => {
+                if(doc.exists && atob(doc.data().password) === pass) {
+                    girisBasarili(email, docN);
+                } else { alert("Hatalı bilgiler!"); }
+            });
+        } else {
+            db.collection("sistem_kullanicilari").doc(docN).set({realEmail:email, password: btoa(pass)})
+            .then(() => { alert("Kayıt başarılı! Giriş yapabilirsiniz."); toggleMode(); });
+        }
+    }
+
+    function sifremiUnuttum() {
+        const email = document.getElementById('email').value.trim().toLowerCase();
+        if(!email) { alert("Önce e-posta yazın!"); return; }
+        const docN = email.replace(/\./g, "_");
+        db.collection("sistem_kullanicilari").doc(docN).get().then(doc => {
+            if(doc.exists) alert("Şifreniz: " + atob(doc.data().password));
+            else alert("Hesap bulunamadı.");
+        });
+    }
+
+    function girisBasarili(email, docN) {
+        aktifUser = docN;
+        document.getElementById('user-label').innerText = email;
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('app-content').style.display = 'block';
+        const d = new Date();
+        document.getElementById('select-month').value = d.getMonth();
+        document.getElementById('select-year').value = d.getFullYear();
+        verileriYukle(true);
+    }
 
     window.onload = function() {
         const ms = document.getElementById('select-month');
         const ys = document.getElementById('select-year');
         ["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"].forEach((a,i)=>ms.add(new Option(a,i)));
         for(let y=2025;y<=2030;y++) ys.add(new Option(y,y));
-        ms.value = new Date().getMonth(); ys.value = new Date().getFullYear();
     };
-
-    function login() {
-        const email = document.getElementById('email').value.trim().toLowerCase();
-        const pass = document.getElementById('password').value;
-        const docN = email.replace(/\./g, "_");
-        db.collection("sistem_kullanicilari").doc(docN).get().then(doc => {
-            if(doc.exists && atob(doc.data().password) === pass) {
-                aktifUser = docN;
-                document.getElementById('login-screen').style.display='none';
-                document.getElementById('app-content').style.display='block';
-                verileriYukle(true);
-            } else { alert("Hatalı Giriş!"); }
-        });
-    }
 
     function verileriKaydet() {
         if(!aktifUser) return;
@@ -160,7 +191,10 @@
             const tu = r.querySelector('.in-tu').value;
             if(ad || tu) gelirler.push({ad, tu});
         });
-        db.collection("kullanici_verileri").doc(aktifUser).collection("donemler").doc(donem).set({giderler, gelirler}).then(hesapla);
+        db.collection("kullanici_verileri").doc(aktifUser).collection("donemler").doc(donem).set({giderler, gelirler}).then(() => {
+            hesapla();
+            giderleriSirala();
+        });
     }
 
     function verileriYukle(bildirim = false) {
@@ -171,66 +205,44 @@
             if(doc.exists) {
                 const d = doc.data();
                 if(d.giderler) {
-                    d.giderler.sort((a,b)=>(parseInt(a.gu)||99)-(parseInt(b.gu)||99)).forEach(g => giderEkle(g.ad, g.tu, g.gu, g.od));
+                    d.giderler.sort((a,b)=>(parseInt(a.gu)||99)-(parseInt(b.gu)||99));
+                    d.giderler.forEach(g => giderSatiriEkle(g.ad, g.tu, g.gu, g.od));
                     if(bildirim) kontrolEt(d.giderler);
-                }
-                if(d.gelirler) d.gelirler.forEach(g => gelirEkle(g.ad, g.tu));
-            }
+                } else { giderSatiriEkle(); }
+                if(d.gelirler) d.gelirler.forEach(g => gelirSatiriEkle(g.ad, g.tu));
+                else { gelirSatiriEkle(); }
+            } else { giderSatiriEkle(); gelirSatiriEkle(); }
             hesapla();
         });
     }
 
-    function giderEkle(ad='', tu='', gu='', od=false, tetik=false) {
-        const id = 'g'+Date.now()+Math.random();
+    function giderSatiriEkle(ad='', tu='', gu='', od=false, tetik=false) {
+        const id = 'g'+Date.now()+Math.random().toString(36).substr(2,5);
         const html = `
             <div class="row gider-row gider-item" id="${id}">
-                <div class="cell"><input type="text" class="in-ad" value="${ad}" placeholder="..." onchange="verileriKaydet()"></div>
+                <div class="cell"><input type="text" class="in-ad" value="${ad}" placeholder="..." onchange="taksitSor('${id}')"></div>
                 <div class="cell"><input type="number" class="in-tu" value="${tu}" placeholder="0" onchange="verileriKaydet()"></div>
                 <div class="cell"><input type="number" class="in-gu" value="${gu}" placeholder="-" onchange="verileriKaydet()"></div>
                 <div class="cell" style="justify-content:center"><input type="checkbox" class="in-od" ${od?'checked':''} onchange="verileriKaydet()"></div>
-                <div class="cell"><button class="btn-del" onclick="sil('${id}')">×</button></div>
+                <div class="cell"><button class="del-btn" onclick="satirSil('${id}')">×</button></div>
             </div>`;
         document.getElementById('giderBody').insertAdjacentHTML('beforeend', html);
         if(tetik) verileriKaydet();
     }
 
-    function gelirEkle(ad='', tu='', tetik=false) {
+    function gelirSatiriEkle(ad='', tu='', tetik=false) {
         const id = 'gel'+Date.now();
         const html = `
             <div class="row gelir-row gelir-item" id="${id}">
                 <div class="cell"><input type="text" class="in-ad" value="${ad}" placeholder="..." onchange="verileriKaydet()"></div>
                 <div class="cell"><input type="number" class="in-tu" value="${tu}" placeholder="0" onchange="verileriKaydet()"></div>
-                <div class="cell"><button class="btn-del" onclick="sil('${id}')">×</button></div>
+                <div class="cell"><button class="del-btn" onclick="satirSil('${id}')">×</button></div>
             </div>`;
         document.getElementById('gelirBody').insertAdjacentHTML('beforeend', html);
         if(tetik) verileriKaydet();
     }
 
-    function sil(id) { if(confirm("Silinsin mi?")) { document.getElementById(id).remove(); verileriKaydet(); } }
-
-    function hesapla() {
-        let tg=0, tod=0, tgel=0;
-        document.querySelectorAll('.gider-item').forEach(r => {
-            let v = parseFloat(r.querySelector('.in-tu').value)||0;
-            tg += v; if(r.querySelector('.in-od').checked) tod += v;
-        });
-        document.querySelectorAll('.gelir-item').forEach(r => tgel += parseFloat(r.querySelector('.in-tu').value)||0);
-        
-        document.getElementById('toplamGider').innerText = tg.toLocaleString() + " TL";
-        document.getElementById('toplamGelir').innerText = tgel.toLocaleString() + " TL";
-        document.getElementById('kalanOdeme').innerText = (tg - tod).toLocaleString() + " TL";
-        
-        const denge = tgel - tg;
-        const dBox = document.getElementById('dengeBox');
-        document.getElementById('denge').innerText = denge.toLocaleString() + " TL";
-        dBox.className = denge >= 0 ? "box box-green" : "box box-red";
-    }
-
-    function kontrolEt(liste) {
-        const gun = new Date().getDate();
-        const gecen = liste.filter(g => parseInt(g.gu) < gun && !g.od && g.ad).map(g => g.ad);
-        if(gecen.length > 0) alert("⚠️ Ödemesi Gecikenler:\n" + gecen.join(", "));
-    }
-</script>
-</body>
-</html>
+    function taksitSor(id) {
+        const row = document.getElementById(id);
+        const ad = row.querySelector('.in-ad').value;
+        const tu = row.querySelector('.in-tu').value;
