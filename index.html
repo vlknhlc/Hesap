@@ -3,13 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Bütçe Takip Pro v19</title>
+    <title>Bütçe Takip Pro v20</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
     <style>
         :root { 
             --primary: #2c3e50; --accent: #3498db; --danger: #e74c3c; --success: #27ae60; --warning: #f39c12;
             --bg: #f4f7f6; --row-bg: #ffffff; --border: #dfe6e9;
+            /* Yeni Pastel Satır Renkleri */
+            --row-success: #e8f5e9;
+            --row-danger: #ffebee;
+            --row-warning: #fffde7;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
         body { background: var(--bg); padding: 5px; }
@@ -37,7 +41,7 @@
 
         /* Tablo ve Excel Görünümü */
         .section-header { background: #f8f9fa; padding: 10px; font-weight: bold; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
-        .row { display: grid; border-bottom: 1px solid var(--border); align-items: center; min-height: 48px; background: var(--row-bg); }
+        .row { display: grid; border-bottom: 1px solid var(--border); align-items: center; min-height: 48px; background: var(--row-bg); transition: background-color 0.3s; }
         .g-row { grid-template-columns: 1fr 80px 50px 35px 30px 30px; }
         .gel-row { grid-template-columns: 1fr 100px 35px; }
         .head-cell { font-size: 10px; color: #7f8c8d; text-align: center; font-weight: bold; text-transform: uppercase; }
@@ -45,7 +49,7 @@
         .cell:first-child { justify-content: flex-start; }
         .table-input { width: 100%; border: none !important; padding: 8px 4px; background: transparent; font-size: 13px; outline: none; }
         .in-tu { font-weight: bold; text-align: right; color: var(--primary); }
-        .in-gu { font-weight: 800; text-align: center; color: var(--accent); font-size: 14px; background: #f0f7ff !important; }
+        .in-gu { font-weight: 800; text-align: center; color: var(--accent); font-size: 14px; background: rgba(240, 247, 255, 0.5) !important; }
         input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--success); cursor: pointer; }
         .del-btn { background: none; border: none; color: #ccc; font-size: 18px; cursor: pointer; width: 100%; }
         .taksit-btn { background: none; border: none; color: var(--accent); font-size: 14px; cursor: pointer; width: 100%; filter: grayscale(0.2); }
@@ -201,7 +205,7 @@
             });
         });
         
-        geçmişHafıza.push({ giderler: gids, gelirler: gels });
+        geçmişHafıza.push({ giderler: gids, gelatinler: gels, gelirler: gels });
         if (geçmişHafıza.length > 20) geçmişHafıza.shift();
     }
 
@@ -213,11 +217,12 @@
         document.getElementById('gel-list').innerHTML = "";
         
         sonDurum.giderler.forEach(x => satirBas('gider', x));
-        sonDurum.gelirler.forEach(x => satirBas('gelir', x));
+        const nGelir = sonDurum.gelirler || sonDurum.gelatinler || [];
+        nGelir.forEach(x => satirBas('gelir', x));
         
         if(!aktifId) return;
         const donem = document.getElementById('y-sel').value + "_" + document.getElementById('m-sel').value;
-        db.collection("kullanici_verileri").doc(aktifId).collection("donemler").doc(donem).set({giderler: sonDurum.giderler, gelirler: sonDurum.gelirler, gelatinler: sonDurum.gelirler}).then(hesapla);
+        db.collection("kullanici_verileri").doc(aktifId).collection("donemler").doc(donem).set({giderler: sonDurum.giderler, gelirler: nGelir, gelatinler: nGelir}).then(hesapla);
     }
 
     function verileriKaydet() {
@@ -281,230 +286,4 @@
                 <div class="cell"><input type="number" class="table-input in-tu" value="${v.tu}" placeholder="0" onfocus="hafizayaKaydet()" onchange="verileriKaydet()"></div>
                 <div class="cell"><input type="number" class="table-input in-gu" value="${v.gu}" placeholder="Gün" onfocus="hafizayaKaydet()" onchange="verileriKaydet()"></div>
                 <div class="cell"><input type="checkbox" class="in-od" ${v.od?'checked':''} onchange="hafizayaKaydet(); verileriKaydet()"></div>
-                <div class="cell"><button class="taksit-btn" onclick="taksitlendirButonlu('${id}')" title="Bu harcamayı taksitlendir">🗓️</button></div>
-                <div class="cell"><button class="del-btn" onclick="giderSatirSil('${id}')">×</button></div>
-            </div>`;
-        } else {
-            html = `<div class="row gel-row row-item" id="${id}">
-                <div class="cell"><input type="text" class="table-input in-ad" value="${v.ad}" placeholder="Açıklama" onfocus="hafizayaKaydet()" onchange="verileriKaydet()"></div>
-                <div class="cell"><input type="number" class="table-input in-tu" value="${v.tu}" placeholder="0" onfocus="hafizayaKaydet()" onchange="verileriKaydet()"></div>
-                <button class="del-btn" onclick="satirSil('${id}')">×</button>
-            </div>`;
-        }
-        document.getElementById(tip==='gider'?'g-list':'gel-list').insertAdjacentHTML('beforeend', html);
-    }
-
-    function satirEkle(tip) { hafizayaKaydet(); satirBas(tip); verileriKaydet(); }
-    
-    function satirSil(id) { 
-        if(confirm("Silmek istiyor musunuz?")) { 
-            hafizayaKaydet(); 
-            document.getElementById(id).remove(); 
-            verileriKaydet(); 
-        } 
-    }
-
-    function giderSatirSil(id) {
-        const r = document.getElementById(id);
-        const tId = r.dataset.taksitId;
-        const aciklama = r.querySelector('.in-ad').value;
-
-        if(!tId) {
-            if(confirm(`"${aciklama}" harcamasını silmek istiyor musunuz?`)) {
-                hafizayaKaydet(); r.remove(); verileriKaydet();
-            }
-            return;
-        }
-
-        const secim = confirm(`"${aciklama}" bir taksitli harcamadır.\n\n[TAMAM]: Bu taksit grubunu GELECEK TÜM AYLARDAN da siler.\n[İPTAL]: Sadece BU AYDAN siler.`);
-        
-        hafizayaKaydet();
-
-        if (secim) {
-            const sy = parseInt(document.getElementById('y-sel').value);
-            const sm = parseInt(document.getElementById('m-sel').value);
-            
-            r.remove();
-            verileriKaydet();
-
-            for(let i=1; i<=36; i++) {
-                let m = sm + i, y = sy;
-                if(m > 11) { y += Math.floor(m/12); m = m%12; }
-                const dk = `${y}_${m}`;
-
-                db.collection("kullanici_verileri").doc(aktifId).collection("donemler").doc(dk).get().then(doc => {
-                    if(doc.exists) {
-                        let d = doc.data();
-                        if(d.giderler) {
-                            let yeniGiderler = d.giderler.filter(x => x.taksitId !== tId);
-                            db.collection("kullanici_verileri").doc(aktifId).collection("donemler").doc(dk).set({
-                                giderler: yeniGiderler,
-                                gelirler: d.gelirler || d.gelatinler || [],
-                                gelatinler: d.gelirler || d.gelatinler || []
-                            });
-                        }
-                    }
-                });
-            }
-            alert("Taksit grubu bu ay ve gelecek tüm aylardan tamamen temizlendi.");
-            setTimeout(verileriCek, 1000);
-        } else {
-            r.remove();
-            verileriKaydet();
-        }
-    }
-
-    function tumGiderleriSil() {
-        if(confirm("⚠️ UYARI: Bu ayki TÜM GİDERLERİ tek seferde silmek istediğinize emin misiniz?")) {
-            if(confirm("Son onay: Bu işlem o aya ait tüm taksitleri de bu listeden temizleyecektir!")) {
-                hafizayaKaydet();
-                document.getElementById('g-list').innerHTML = "";
-                verileriKaydet();
-                alert("Bu aya ait tüm giderler temizlendi.");
-            }
-        }
-    }
-
-    function gecenAyiKopyala() {
-        if(!confirm("Geçen ayın gider ve gelirlerini bu aya kopyalamak istediğine emin misin? (Mevcut taksitli harcamalarınız korunacaktır)")) return;
-        let m = parseInt(document.getElementById('m-sel').value);
-        let y = parseInt(document.getElementById('y-sel').value);
-        if(m === 0) { m = 11; y--; } else { m--; }
-        const gecenDonem = y + "_" + m;
-        
-        const mevcutGiderler = [];
-        document.querySelectorAll('#g-list .row-item').forEach(r => {
-            const ad = r.querySelector('.in-ad').value;
-            const tu = r.querySelector('.in-tu').value;
-            if(ad || tu) mevcutGiderler.push({ad, tu, gu: r.querySelector('.in-gu').value, od: r.querySelector('.in-od').checked});
-        });
-
-        db.collection("kullanici_verileri").doc(aktifId).collection("donemler").doc(gecenDonem).get().then(doc => {
-            if(doc.exists) {
-                hafizayaKaydet();
-                const d = doc.data();
-                const taksitRegex = /\(\d+\/\d+\)$/;
-
-                if(d.giderler) {
-                    d.giderler.forEach(x => {
-                        if(!taksitRegex.test(x.ad.trim())) {
-                            if(!mevcutGiderler.some(m => m.ad.trim() === x.ad.trim())) {
-                                satirBas('gider', {...x, od: false, taksitId: ""});
-                            }
-                        }
-                    });
-                }
-                
-                const nGelir = d.gelirler || d.gelatinler || [];
-                if(nGelir) {
-                    const mevcutGelirler = Array.from(document.querySelectorAll('#gel-list .in-ad')).map(i => i.value.trim());
-                    nGelir.forEach(x => {
-                        if(!mevcutGelirler.includes(x.ad.trim())) {
-                            satirBas('gelir', x);
-                        }
-                    });
-                }
-                
-                verileriKaydet();
-                alert("Sabit harcamalarınız ve gelirleriniz başarıyla aktarıldı!");
-            } else alert("Geçen aya ait veri bulunamadı.");
-        });
-    }
-
-    function taksitlendirButonlu(id) {
-        const r = document.getElementById(id);
-        const ad = r.querySelector('.in-ad').value.trim();
-        const tu = r.querySelector('.in-tu').value.trim();
-        const gu = r.querySelector('.in-gu').value.trim();
-
-        if(!ad || !tu) {
-            alert("⚠️ Lütfen önce harcamanın Açıklama ve Tutar alanlarını doldurun!");
-            return;
-        }
-
-        if(ad.includes('/') || /\(\d+\/\d+\)$/.test(ad)) {
-            alert("⚠️ Bu harcama zaten taksitlendirilmiş görünüyor!");
-            return;
-        }
-
-        if(confirm(`"${ad}" isimli, ${tu} TL tutarındaki harcamayı taksitlendirmek istiyor musunuz?`)) {
-            const n = parseInt(prompt("Kaç taksit yapmak istersiniz? (Örn: 3, 6, 12)"));
-            if(isNaN(n) || n <= 1) {
-                alert("Geçersiz taksit sayısı girdiniz.");
-                return;
-            }
-
-            hafizayaKaydet();
-            const yeniTaksitGrupId = "tks_" + Date.now() + "_" + Math.random().toString(36).substr(2,4);
-            r.remove();
-
-            const sy = document.getElementById('y-sel').value, sm = document.getElementById('m-sel').value;
-
-            for(let i=0; i<n; i++) {
-                let m = parseInt(sm)+i, y = parseInt(sy); 
-                if(m>11) { y += Math.floor(m/12); m = m%12; }
-                const dk = `${y}_${m}`, ta = `${ad} (${i+1}/${n})`;
-                
-                db.collection("kullanici_verileri").doc(aktifId).collection("donemler").doc(dk).get().then(doc => {
-                    let gs = doc.exists ? (doc.data().giderler || []) : [];
-                    let gl = doc.exists ? (doc.data().gelirler || doc.data().gelatinler || []) : [];
-                    
-                    if(i === 0) {
-                        gs = gs.filter(x => x.ad.trim() !== ad);
-                    }
-
-                    if(!gs.some(x => x.ad === ta)) {
-                        gs.push({ad: ta, tu: tu, gu: gu, od: false, taksitId: yeniTaksitGrupId});
-                        db.collection("kullanici_verileri").doc(aktifId).collection("donemler").doc(dk).set({giderler: gs, gelirler: gl, gelatinler: gl});
-                    }
-                });
-            }
-
-            alert(`Başarılı! Taksit grubu oluşturuldu ve ${n} aya işlendi.`);
-            setTimeout(verileriCek, 1200);
-        }
-    }
-
-    function hesapla() {
-        let tg=0, tod=0, tgel=0;
-        document.querySelectorAll('#g-list .row-item').forEach(r => {
-            let v = parseFloat(r.querySelector('.in-tu').value)||0;
-            tg += v; if(r.querySelector('.in-od').checked) tod += v;
-        });
-        document.querySelectorAll('#gel-list .row-item').forEach(r => tgel += parseFloat(r.querySelector('.in-tu').value)||0);
-        
-        document.getElementById('res-tg').innerText = tg.toLocaleString('tr-TR') + " TL";
-        document.getElementById('res-tgel').innerText = tgel.toLocaleString('tr-TR') + " TL";
-        document.getElementById('res-kalan').innerText = (tg-tod).toLocaleString('tr-TR') + " TL";
-
-        // YENİ ÖZELLİK: Gelir - Gider Dengesi Hesaplama ve +- İşareti ile Renklendirme
-        const netDenge = tgel - tg;
-        const dengeElement = document.getElementById('res-denge');
-        
-        if (netDenge > 0) {
-            dengeElement.innerText = "+ " + netDenge.toLocaleString('tr-TR') + " TL";
-            dengeElement.style.color = "var(--success)";
-        } else if (netDenge < 0) {
-            // Math.abs ile eksi işaretini çiftletmeden temiz gösteriyoruz
-            dengeElement.innerText = "- " + Math.abs(netDenge).toLocaleString('tr-TR') + " TL";
-            dengeElement.style.color = "var(--danger)";
-        } else {
-            dengeElement.innerText = "0 TL";
-            dengeElement.style.color = "var(--primary)";
-        }
-
-        // Progress Bar
-        const bar = document.getElementById('progress-bar');
-        const percLabel = document.getElementById('progress-percent');
-        let oran = tgel > 0 ? (tg / tgel) * 100 : 0;
-        if(oran > 100) oran = 100;
-        bar.style.width = oran + "%";
-        percLabel.innerText = "%" + Math.round(oran);
-        
-        if(oran < 70) bar.style.background = "var(--success)";
-        else if(oran < 90) bar.style.background = "var(--warning)";
-        else bar.style.background = "var(--danger)";
-    }
-</script>
-</body>
-</html>
+                <div class="cell"><button class="taksit-btn" onclick="taksitlendirButon
