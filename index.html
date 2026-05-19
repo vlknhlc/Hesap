@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Bütçe Takip Pro v14</title>
+    <title>Bütçe Takip Pro v15</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
     <style>
@@ -130,8 +130,6 @@
     const db = firebase.firestore();
     let isLogMode = true;
     let aktifId = "";
-    
-    // Geri alma (Undo) geçmişi için hafıza dizisi
     let geçmişHafıza = [];
 
     function modDegis() {
@@ -180,7 +178,6 @@
         m.value = new Date().getMonth(); y.value = new Date().getFullYear();
     };
 
-    // Değişiklik yapılmadan hemen önceki anı hafızaya kaydeder
     function hafizayaKaydet() {
         const gids = [], gels = [];
         document.querySelectorAll('#g-list .row-item').forEach(r => {
@@ -199,7 +196,7 @@
         });
         
         geçmişHafıza.push({ giderler: gids, gelirler: gels });
-        if (geçmişHafıza.length > 20) geçmişHafıza.shift(); // Son 20 işlemi koru
+        if (geçmişHafıza.length > 20) geçmişHafıza.shift();
     }
 
     function geriAl() {
@@ -212,7 +209,6 @@
         sonDurum.giderler.forEach(x => satirBas('gider', x));
         sonDurum.gelirler.forEach(x => satirBas('gelir', x));
         
-        // Firebase senkronizasyonu
         if(!aktifId) return;
         const donem = document.getElementById('y-sel').value + "_" + document.getElementById('m-sel').value;
         db.collection("kullanici_verileri").doc(aktifId).collection("donemler").doc(donem).set({giderler: sonDurum.giderler, gelirler: sonDurum.gelirler}).then(hesapla);
@@ -244,7 +240,6 @@
     }
 
     function verileriCek(uyari = false) {
-        // Dönem değiştiğinde eski dönemin geçmiş hafızasını temizle
         geçmişHafıza = [];
         const donem = document.getElementById('y-sel').value + "_" + document.getElementById('m-sel').value;
         db.collection("kullanici_verileri").doc(aktifId).collection("donemler").doc(donem).get().then(doc => {
@@ -298,7 +293,7 @@
                 hafizayaKaydet();
                 document.getElementById('g-list').innerHTML = "";
                 verileriKaydet();
-                alert("Bu aya ait tüm giderler temizlendi. İsterseniz yukarıdan 'Geri Al' yapabilirsiniz.");
+                alert("Bu aya ait tüm giderler temizlendi.");
             }
         }
     }
@@ -343,7 +338,7 @@
                 }
                 
                 verileriKaydet();
-                alert("Sabit harcamalarınız ve gelirleriniz başarıyla aktarıldı, taksitleriniz korundu!");
+                alert("Sabit harcamalarınız ve gelirleriniz başarıyla aktarıldı!");
             } else alert("Geçen aya ait veri bulunamadı.");
         });
     }
@@ -353,12 +348,20 @@
         const r = document.getElementById(id);
         const ad = r.querySelector('.in-ad').value;
         if(!ad || ad.includes('/')) return verileriKaydet();
+        
         if(confirm(`"${ad}" harcamasını taksitlendirmek ister misiniz?`)) {
             const n = parseInt(prompt("Kaç ay?"));
             if(n > 1) {
                 hafizayaKaydet();
-                const tu = r.querySelector('.in-tu').value, gu = r.querySelector('.in-gu').value;
+                // KESİN ÇÖZÜM: Tutar ve Gün bilgisini anlık olarak canlı DOM yapısından zorunlu olarak çekiyoruz.
+                const tu = r.querySelector('.in-tu').value || "0";
+                const gu = r.querySelector('.in-gu').value || "";
+                
                 const sy = document.getElementById('y-sel').value, sm = document.getElementById('m-sel').value;
+                
+                // İlk ayı hemen kaydedelim ki mevcut veri de kaybolmasın
+                verileriKaydet();
+
                 for(let i=0; i<n; i++) {
                     let m = parseInt(sm)+i, y = parseInt(sy); if(m>11) { y += Math.floor(m/12); m = m%12; }
                     const dk = `${y}_${m}`, ta = `${ad} (${i+1}/${n})`;
@@ -371,7 +374,7 @@
                         }
                     });
                 }
-                setTimeout(verileriCek, 1000);
+                setTimeout(verileriCek, 1200);
             }
         } else verileriKaydet();
     }
