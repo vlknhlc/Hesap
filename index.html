@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Bütçe Takip Pro v17</title>
+    <title>Bütçe Takip Pro v18</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
     <style>
@@ -188,7 +188,8 @@
                 ad: r.querySelector('.in-ad').value,
                 tu: r.querySelector('.in-tu').value,
                 gu: r.querySelector('.in-gu').value,
-                od: r.querySelector('.in-od').checked
+                od: r.querySelector('.in-od').checked,
+                taksitId: r.dataset.taksitId || "" // Taksit grup numarasını koru
             });
         });
         document.querySelectorAll('#gel-list .row-item').forEach(r => {
@@ -214,7 +215,7 @@
         
         if(!aktifId) return;
         const donem = document.getElementById('y-sel').value + "_" + document.getElementById('m-sel').value;
-        db.collection("kullanici_verileri").doc(aktifId).collection("donemler").doc(donem).set({giderler: sonDurum.giderler, gelatinler: sonDurum.gelirler, gelirler: sonDurum.gelirler}).then(hesapla);
+        db.collection("kullanici_verileri").doc(aktifId).collection("donemler").doc(donem).set({giderler: sonDurum.giderler, gelirler: sonDurum.gelirler, gelatinler: sonDurum.gelirler}).then(hesapla);
     }
 
     function verileriKaydet() {
@@ -225,14 +226,14 @@
         document.querySelectorAll('#g-list .row-item').forEach(r => {
             const ad = r.querySelector('.in-ad').value;
             const tu = r.querySelector('.in-tu').value;
-            if(ad || tu) gids.push({ad, tu, gu: r.querySelector('.in-gu').value, od: r.querySelector('.in-od').checked});
+            if(ad || tu) gids.push({ad, tu, gu: r.querySelector('.in-gu').value, od: r.querySelector('.in-od').checked, taksitId: r.dataset.taksitId || ""});
         });
         document.querySelectorAll('#gel-list .row-item').forEach(r => {
             const ad = r.querySelector('.in-ad').value;
             const tu = r.querySelector('.in-tu').value;
             if(ad || tu) gels.push({ad, tu});
         });
-        db.collection("kullanici_verileri").doc(aktifId).collection("donemler").doc(donem).set({giderler:gids, gelatinler:gels, gelirler:gels}).then(hesapla);
+        db.collection("kullanici_verileri").doc(aktifId).collection("donemler").doc(donem).set({giderler:gids, gelirler:gels, gelatinler:gels}).then(hesapla);
     }
 
     function siralaArayuz() {
@@ -268,18 +269,18 @@
         });
     }
 
-    function satirBas(tip, v={ad:'', tu:'', gu:'', od:false}) {
+    function satirBas(tip, v={ad:'', tu:'', gu:'', od:false, taksitId:''}) {
         const id = "r" + Math.random().toString(36).substr(2,7);
         let html = "";
         
         if(tip === 'gider') {
-            html = `<div class="row g-row row-item" id="${id}">
+            html = `<div class="row g-row row-item" id="${id}" data-taksit-id="${v.taksitId || ''}">
                 <div class="cell"><input type="text" class="table-input in-ad" value="${v.ad}" placeholder="Açıklama" onfocus="hafizayaKaydet()" onchange="verileriKaydet()"></div>
                 <div class="cell"><input type="number" class="table-input in-tu" value="${v.tu}" placeholder="0" onfocus="hafizayaKaydet()" onchange="verileriKaydet()"></div>
                 <div class="cell"><input type="number" class="table-input in-gu" value="${v.gu}" placeholder="Gün" onfocus="hafizayaKaydet()" onchange="verileriKaydet()"></div>
                 <div class="cell"><input type="checkbox" class="in-od" ${v.od?'checked':''} onchange="hafizayaKaydet(); verileriKaydet()"></div>
                 <div class="cell"><button class="taksit-btn" onclick="taksitlendirButonlu('${id}')" title="Bu harcamayı taksitlendir">🗓️</button></div>
-                <div class="cell"><button class="del-btn" onclick="satirSil('${id}')">×</button></div>
+                <div class="cell"><button class="del-btn" onclick="giderSatirSil('${id}')">×</button></div>
             </div>`;
         } else {
             html = `<div class="row gel-row row-item" id="${id}">
@@ -299,6 +300,63 @@
             document.getElementById(id).remove(); 
             verileriKaydet(); 
         } 
+    }
+
+    // YENİ Gelişmiş Zincirleme Taksit Silme Fonksiyonu
+    function giderSatirSil(id) {
+        const r = document.getElementById(id);
+        const tId = r.dataset.taksitId;
+        const aciklama = r.querySelector('.in-ad').value;
+
+        // Eğer silinen veri taksitli değilse, normal silme işlemi yap
+        if(!tId) {
+            if(confirm(`"${aciklama}" harcamasını silmek istiyor musunuz?`)) {
+                hafizayaKaydet(); r.remove(); verileriKaydet();
+            }
+            return;
+        }
+
+        // Eğer taksitli bir veri ise kullanıcıya çift seçenek sun
+        const secim = confirm(`"${aciklama}" bir taksitli harcamadır.\n\n[TAMAM]: Bu taksit grubunu GELECEK TÜM AYLARDAN da siler.\n[İPTAL]: Sadece BU AYDAN siler.`);
+        
+        hafizayaKaydet();
+
+        if (secim) {
+            // Gelecek tüm aylardan silme mekanizması
+            const sy = parseInt(document.getElementById('y-sel').value);
+            const sm = parseInt(document.getElementById('m-sel').value);
+            
+            r.remove();
+            verileriKaydet();
+
+            // Bulunduğumuz aydan başlayıp sonraki 36 ayı tarayarak bu ID'ye sahip tüm taksitleri siler
+            for(let i=1; i<=36; i++) {
+                let m = sm + i, y = sy;
+                if(m > 11) { y += Math.floor(m/12); m = m%12; }
+                const dk = `${y}_${m}`;
+
+                db.collection("kullanici_verileri").doc(aktifId).collection("donemler").doc(dk).get().then(doc => {
+                    if(doc.exists) {
+                        let d = doc.data();
+                        if(d.giderler) {
+                            let yeniGiderler = d.giderler.filter(x => x.taksitId !== tId);
+                            db.collection("kullanici_verileri").doc(aktifId).collection("donemler").doc(dk).set({
+                                giderler: yeniGiderler,
+                                gelirler: d.gelirler || d.gelatinler || [],
+                                gelatinler: d.gelirler || d.gelatinler || []
+                            });
+                        }
+                    }
+                });
+            }
+            alert("Taksit grubu bu ay ve gelecek tüm aylardan tamamen temizlendi.");
+            setTimeout(verileriCek, 1000);
+
+        } else {
+            // Sadece bu aydan sil
+            r.remove();
+            verileriKaydet();
+        }
     }
 
     function tumGiderleriSil() {
@@ -336,7 +394,7 @@
                     d.giderler.forEach(x => {
                         if(!taksitRegex.test(x.ad.trim())) {
                             if(!mevcutGiderler.some(m => m.ad.trim() === x.ad.trim())) {
-                                satirBas('gider', {...x, od: false});
+                                satirBas('gider', {...x, od: false, taksitId: ""});
                             }
                         }
                     });
@@ -383,7 +441,9 @@
 
             hafizayaKaydet();
             
-            // KESİN ÇÖZÜM: Mükerrerliği önlemek için ilk yazılan düz satırı ekrandan (DOM) tamamen uçuruyoruz.
+            // YENİ: Bu taksit serisini bağlayacak benzersiz grup ID'si oluşturuyoruz
+            const yeniTaksitGrupId = "tks_" + Date.now() + "_" + Math.random().toString(36).substr(2,4);
+
             r.remove();
 
             const sy = document.getElementById('y-sel').value, sm = document.getElementById('m-sel').value;
@@ -397,19 +457,19 @@
                     let gs = doc.exists ? (doc.data().giderler || []) : [];
                     let gl = doc.exists ? (doc.data().gelirler || doc.data().gelatinler || []) : [];
                     
-                    // Eğer mevcut ayda eski (yalın) kayıt kalmışsa onu temizliyoruz (Asenkron güvenlik filtresi)
                     if(i === 0) {
                         gs = gs.filter(x => x.ad.trim() !== ad);
                     }
 
                     if(!gs.some(x => x.ad === ta)) {
-                        gs.push({ad: ta, tu: tu, gu: gu, od: false});
+                        // Yeni: taksitId bilgisini her aya ekleyerek zincirleme bağ kuruyoruz
+                        gs.push({ad: ta, tu: tu, gu: gu, od: false, taksitId: yeniTaksitGrupId});
                         db.collection("kullanici_verileri").doc(aktifId).collection("donemler").doc(dk).set({giderler: gs, gelirler: gl, gelatinler: gl});
                     }
                 });
             }
 
-            alert(`Başarılı! İlk satır temizlendi ve taksitler ${n} aya tutar (${tu} TL) ve gün (${gu}) bilgileriyle işlendi.`);
+            alert(`Başarılı! Taksit grubu oluşturuldu ve ${n} aya işlendi.`);
             setTimeout(verileriCek, 1200);
         }
     }
