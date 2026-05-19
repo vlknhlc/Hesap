@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Bütçe Takip Pro v16</title>
+    <title>Bütçe Takip Pro v17</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
     <style>
@@ -261,7 +261,6 @@
                         }, 1000);
                     }
                 }
-                // Eski 'gelatinler' veya yeni 'gelirler' alanından uyumluluk kontrolü
                 const nGelir = d.gelirler || d.gelatinler || [];
                 nGelir.forEach(x => satirBas('gelir', x));
             }
@@ -335,7 +334,6 @@
 
                 if(d.giderler) {
                     d.giderler.forEach(x => {
-                        // Eğer harcama adı bir taksit ibaresi barındırmıyorsa KOPYALA
                         if(!taksitRegex.test(x.ad.trim())) {
                             if(!mevcutGiderler.some(m => m.ad.trim() === x.ad.trim())) {
                                 satirBas('gider', {...x, od: false});
@@ -360,7 +358,6 @@
         });
     }
 
-    // YENİ KESİN ÇÖZÜM: Kullanıcı veriyi girip hazır olduğunda çalışan Butonlu Taksitlendirme
     function taksitlendirButonlu(id) {
         const r = document.getElementById(id);
         const ad = r.querySelector('.in-ad').value.trim();
@@ -385,9 +382,12 @@
             }
 
             hafizayaKaydet();
+            
+            // KESİN ÇÖZÜM: Mükerrerliği önlemek için ilk yazılan düz satırı ekrandan (DOM) tamamen uçuruyoruz.
+            r.remove();
+
             const sy = document.getElementById('y-sel').value, sm = document.getElementById('m-sel').value;
 
-            // Döngü ile gelecek aylara hatasız veriyi asenkron güvenliğiyle yazıyoruz
             for(let i=0; i<n; i++) {
                 let m = parseInt(sm)+i, y = parseInt(sy); 
                 if(m>11) { y += Math.floor(m/12); m = m%12; }
@@ -397,7 +397,11 @@
                     let gs = doc.exists ? (doc.data().giderler || []) : [];
                     let gl = doc.exists ? (doc.data().gelirler || doc.data().gelatinler || []) : [];
                     
-                    // Mükerrer kontrolü
+                    // Eğer mevcut ayda eski (yalın) kayıt kalmışsa onu temizliyoruz (Asenkron güvenlik filtresi)
+                    if(i === 0) {
+                        gs = gs.filter(x => x.ad.trim() !== ad);
+                    }
+
                     if(!gs.some(x => x.ad === ta)) {
                         gs.push({ad: ta, tu: tu, gu: gu, od: false});
                         db.collection("kullanici_verileri").doc(aktifId).collection("donemler").doc(dk).set({giderler: gs, gelirler: gl, gelatinler: gl});
@@ -405,7 +409,7 @@
                 });
             }
 
-            alert(`Başarılı! Taksitler gelecek ${n} aya tutar (${tu} TL) ve gün (${gu}) bilgileriyle işlendi.`);
+            alert(`Başarılı! İlk satır temizlendi ve taksitler ${n} aya tutar (${tu} TL) ve gün (${gu}) bilgileriyle işlendi.`);
             setTimeout(verileriCek, 1200);
         }
     }
