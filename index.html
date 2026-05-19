@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Bütçe Takip Pro v12</title>
+    <title>Bütçe Takip Pro v13</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
     <style>
@@ -186,7 +186,7 @@
             const tu = r.querySelector('.in-tu').value;
             if(ad || tu) gels.push({ad, tu});
         });
-        db.collection("kullanici_verileri").doc(aktifId).collection("donemler").doc(donem).set({giderler:gids, gelatinler:gels, gelirler:gels}).then(hesapla);
+        db.collection("kullanici_verileri").doc(aktifId).collection("donemler").doc(donem).set({giderler:gids, gelirler:gels}).then(hesapla);
     }
 
     function siralaArayuz() {
@@ -243,7 +243,6 @@
         if(m === 0) { m = 11; y--; } else { m--; }
         const gecenDonem = y + "_" + m;
         
-        // Bu ayın halihazırda var olan (otomatik eklenmiş taksitler dahil) verilerini korumak için çekiyoruz
         const mevcutGiderler = [];
         document.querySelectorAll('#g-list .row-item').forEach(r => {
             const ad = r.querySelector('.in-ad').value;
@@ -254,23 +253,19 @@
         db.collection("kullanici_verileri").doc(aktifId).collection("donemler").doc(gecenDonem).get().then(doc => {
             if(doc.exists) {
                 const d = doc.data();
-                
-                // Geçen aydan gelen taksitli satırları filtreleyen regex (Örn: "Harcama (1/3)" veya "Test (2/12)" formatı)
                 const taksitRegex = /\(\d+\/\d+\)$/;
 
                 if(d.giderler) {
                     d.giderler.forEach(x => {
-                        // Eğer açıklama bir taksit kalıbı İÇERMİYORSA ve bu ayda aynı isimde bir harcama henüz YOKSA listeye ekle
                         if(!taksitRegex.test(x.ad.trim())) {
                             if(!mevcutGiderler.some(m => m.ad.trim() === x.ad.trim())) {
-                                satirBas('gider', {...x, od: false}); // Yeni aya borç olarak geçsin diye 'od' false yapılır
+                                satirBas('gider', {...x, od: false});
                             }
                         }
                     });
                 }
                 
                 if(d.gelirler) {
-                    // Gelirler için mükerrer kontrolü yapıp arayüze basalım
                     const mevcutGelirler = Array.from(document.querySelectorAll('#gel-list .in-ad')).map(i => i.value.trim());
                     d.gelirler.forEach(x => {
                         if(!mevcutGelirler.includes(x.ad.trim())) {
@@ -298,10 +293,13 @@
                 for(let i=0; i<n; i++) {
                     let m = parseInt(sm)+i, y = parseInt(sy); if(m>11) { y += Math.floor(m/12); m = m%12; }
                     const dk = `${y}_${m}`, ta = `${ad} (${i+1}/${n})`;
+                    
+                    // Gelecek aylara ait dokümanı çekip güncelliyoruz
                     db.collection("kullanici_verileri").doc(aktifId).collection("donemler").doc(dk).get().then(doc => {
                         let gs = doc.exists ? (doc.data().giderler || []) : [];
                         if(!gs.some(x => x.ad === ta)) {
-                            gs.push({ad:ta, tu, gu, od:false});
+                            // HATA DÜZELTİLDİ: tu (tutar) ve gu (gün) bilgileri de objeye eklenerek sonraki aylara gönderiliyor.
+                            gs.push({ad: ta, tu: tu, gu: gu, od: false});
                             db.collection("kullanici_verileri").doc(aktifId).collection("donemler").doc(dk).set({giderler:gs, gelirler:(doc.exists?doc.data().gelirler:[])});
                         }
                     });
