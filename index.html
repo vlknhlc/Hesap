@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Bütçe Takip Pro v22 + AI</title>
+    <title>Bütçe Takip Pro v22.1 + Akıllı AI</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
     <style>
@@ -153,12 +153,12 @@
     </div>
 
     <div class="ai-container">
-        <div class="ai-header">🧠 AI KIŞISEL FİNANSAL DANIŞMANINIZ</div>
+        <div class="ai-header">🧠 AI AKILLI FİNANS ASİSTANI v22.1</div>
         <div class="ai-box" id="ai-chat-box">
-            <div class="msg ai">Selam Volkan! Ben senin akıllı finans asistanınım. Mevcut 12 aylık bütçeni, taksitlerini ve gelir dengeni canlı okuyabiliyorum. <br><br><b>Neler yapabilirim?</b><br>1- Bana kredi kartı borç ve limitlerini yaz, senin için asgari ödeme projeksiyonu çıkarıp borcun biteceği ayı söyleyeyim.<br>2- Doğrudan komut ver: <i>"Ağustos 2026 dönemine 500.000 TL toplu para gelecek yaz"</i> de, arka planda Firebase veritabanına işleyeyim!</div>
+            <div class="msg ai">Selam Volkan! Sistemi tamamen senin verdiğin yeni direktife göre güncelledim. Artık tek bir aya değil, belirttiğin **tüm geniş tarih aralıklarına** toplu ekleme ve silme operasyonları yapabiliyorum! <br><br><b>Örnek Komutlar:</b><br>• <i>"2026 eylül ayından yıl sonuna kadar olan vakıf giderini sistemden temizle."</i><br>• <i>"Hazirandan yıl sonuna kadar her aya 'Prim' adında 50.000 TL gelir ekle."</i></div>
         </div>
         <div class="ai-input-group">
-            <input type="text" id="ai-user-input" placeholder="AI'a sorun veya veritabanı komutu verin..." onkeydown="if(event.key==='Enter') aiMesajGonder()">
+            <input type="text" id="ai-user-input" placeholder="Toplu işlem emri verin..." onkeydown="if(event.key==='Enter') aiMesajGonder()">
             <button onclick="aiMesajGonder()">GÖNDER</button>
         </div>
     </div>
@@ -176,7 +176,6 @@
     firebase.initializeApp(config);
     const db = firebase.firestore();
 
-    // 🔑 Google Gemini API Key entegre edildi
     const GEMINI_API_KEY = "AIzaSyAbD6sO0u5zmWSO_ICEbLz3kJNpOWtYiLw"; 
 
     let isLogMode = true;
@@ -500,7 +499,9 @@
         });
     }
 
-    // AI Chat Engine
+    // =======================================================
+    // 🧠 YAPAY ZEKA TOPLU İŞLEM MOTORU (BULK ENGINE v22.1)
+    // =======================================================
     function aiMesajGonder() {
         const inp = document.getElementById('ai-user-input');
         const txt = inp.value.trim();
@@ -512,28 +513,34 @@
         const box = document.getElementById('ai-chat-box');
         const loadingDiv = document.createElement('div');
         loadingDiv.className = "msg ai";
-        loadingDiv.innerText = "Düşünüyorum ve hesap kitap yapıyorum... 🧠";
+        loadingDiv.innerText = "İstediğin tarih aralığını analiz edip veritabanı planı hazırlıyorum... 🧠";
         box.appendChild(loadingDiv);
         box.scrollTop = box.scrollHeight;
 
         const aktifYil = document.getElementById('yillik-y-sel').value;
 
         const systemPrompt = `Sen kullanıcının kişisel finansal yapay zeka danışmanısın. Kullanıcının adı Volkan. 
-        Sana kullanıcının ${aktifYil} yılına ait 12 aylık canlı bütçe verileri JSON formatında aşağıda veriliyor.
+        Kullanıcı senden bütçesine TOPLU ekleme veya TOPLU silme işlemi talep ediyor.
+        Sana kullanıcının seçili ${aktifYil} yılına ait bütçe özeti veriliyor: ${JSON.stringify(globalYillikDataCaches)}
+
+        KURALLAR VE FORMAT:
+        Kullanıcı senden belirli bir ay aralığına işlem yapmanı isterse (Örn: "Eylülden yıl sonuna kadar Vakıf giderini kaldır" veya "Hazirandan yıl sonuna kadar 50000 TL maaş3 ekle"), yanıtının en sonuna sadece ve kesinlikle şu toplu komut formatını eklemelisin:
         
-        Kullanıcı senden geleceğe dair bir öngörü, kredi kartı asgari ödeme simülasyonu veya borç bitirme planı isterse matematiksel olarak hesapla ve harika finansal yönlendirmeler yap.
-        Eğer kullanıcı sana "Şu aya şu geliri/gideri ekle" derse (Örn: "Ağustosa 500000 TL gelir ekle, açıklama: Toplu Para") bunu yapabileceğini söyle ve yanıtının EN SONUNA kesinlikle ve sadece şu formatta bir komut satırı ekle:
-        COMMAND:{"action":"add","type":"gelir","month":7,"ad":"Toplu Para","tu":500000}
-        (Not: month parametresi 0 tabanlıdır. Ocak=0, Şubat=1... Ağustos=7, Aralık=11. type ise "gelir" veya "gider" olabilir). Başka hiçbir kod bloğu açma, komutu düz metin olarak ver.
-        
-        İŞTE CANLI KULLANICI VERİLERİ (${aktifYil} Yılı):
-        ${JSON.stringify(globalYillikDataCaches)}`;
+        COMMAND:{"action":"bulk","type":"gider_sil","startMonth":8,"endMonth":11,"targetName":"vakıf"}
+        veya
+        COMMAND:{"action":"bulk","type":"gelir_ekle","startMonth":5,"endMonth":11,"ad":"maaş3","tu":50000}
+
+        Ayların indexleri 0 tabanlıdır: Ocak=0, Şubat=1, Mart=2, Nisan=3, Mayıs=4, Haziran=5, Temmuz=6, Ağustos=7, Eylül=8, Ekim=9, Kasım=10, Aralık=11.
+        "Yıl sonuna kadar" ifadesi endMonth değerinin 11 (Aralık) olacağı anlamına gelir.
+        Silme işlemlerinde type "gider_sil" veya "gelir_sil" olabilir. targetName kısmına silinecek kelimenin (küçük/büyük harfe duyarsız arama için) kökünü yaz.
+        Ekleme işlemlerinde type "gider_ekle" veya "gelir_ekle" olabilir.
+        Yanıtının üst kısmında kullanıcıya samimi, net ve ne yapacağını açıklayan bir metin yaz. En alta COMMAND satırını düz metin olarak iliştir.`;
 
         fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                contents: [{ parts: [{ text: systemPrompt + "\n\nKullanıcı Sorusu: " + txt }] }]
+                contents: [{ parts: [{ text: systemPrompt + "\n\nKullanıcı Emri: " + txt }] }]
             })
         })
         .then(res => res.json())
@@ -547,8 +554,8 @@
                 const commandJsonStr = parts[1].trim();
                 try {
                     const cmd = JSON.parse(commandJsonStr);
-                    executeAiCommand(cmd, aktifYil);
-                } catch(e) { console.log("Komut parse hatası", e); }
+                    executeBulkAiCommand(cmd, aktifYil);
+                } catch(e) { console.log("Toplu komut parse hatası", e); }
             }
 
             aiMesajBas(aiResponse.replace(/\n/g, "<br>"), 'ai');
@@ -568,24 +575,45 @@
         box.scrollTop = box.scrollHeight;
     }
 
-    function executeAiCommand(cmd, yil) {
-        if(cmd.action === 'add') {
-            const donemKod = yil + "_" + cmd.month;
-            db.collection("kullanici_verileri").doc(aktifId).collection("donemler").doc(donemKod).get().then(doc => {
-                let gs = doc.exists ? (doc.data().giderler || []) : [];
-                let gl = doc.exists ? (doc.data().gelirler || doc.data().gelatinler || []) : [];
-                
-                if(cmd.type === 'gelir') {
-                    gl.push({ad: cmd.ad, tu: cmd.tu.toString()});
-                } else {
-                    gs.push({ad: cmd.ad, tu: cmd.tu.toString(), gu: "15", od: false, taksitId: ""});
-                }
+    // 🚀 TOPLU VERİTABANI OPERASYON MOTORU
+    function executeBulkAiCommand(cmd, yil) {
+        if(cmd.action === 'bulk') {
+            let promises = [];
+            const sMonth = parseInt(cmd.startMonth);
+            const eMonth = parseInt(cmd.endMonth);
 
-                db.collection("kullanici_verileri").doc(aktifId).collection("donemler").doc(donemKod).set({giderler: gs, gelirler: gl, gelatinler: gl})
-                .then(() => {
-                    aiMesajBas(`⚡ <b>[SİSTEM OTOMASYONU]:</b> AI komutu ile ${aylarIsimleri[cmd.month]} ${yil} dönemine "${cmd.ad}" başarıyla işlendi ve Firebase güncellendi!`, 'ai');
-                    verileriCek();
+            aiMesajBas(`⚡ <b>[SİSTEM OTOMASYONU]:</b> ${aylarIsimleri[sMonth]} - ${aylarIsimleri[eMonth]} arası toplu işlem sıraya alındı, Firebase güncelleniyor...`, 'ai');
+
+            for(let m = sMonth; m <= eMonth; m++) {
+                const donemKod = yil + "_" + m;
+                let p = db.collection("kullanici_verileri").doc(aktifId).collection("donemler").doc(donemKod).get().then(doc => {
+                    let gs = doc.exists ? (doc.data().giderler || []) : [];
+                    let gl = doc.exists ? (doc.data().gelirler || doc.data().gelatinler || []) : [];
+                    
+                    if(cmd.type === 'gider_sil') {
+                        // Kısmi eşleşme ile filtreleme yapıyoruz (küçük harfe çevirerek)
+                        gs = gs.filter(x => !x.ad.toLowerCase().includes(cmd.targetName.toLowerCase()));
+                    } 
+                    else if(cmd.type === 'gelir_sil') {
+                        gl = gl.filter(x => !x.ad.toLowerCase().includes(cmd.targetName.toLowerCase()));
+                    }
+                    else if(cmd.type === 'gelir_ekle') {
+                        gl.push({ad: cmd.ad, tu: cmd.tu.toString()});
+                    } 
+                    else if(cmd.type === 'gider_ekle') {
+                        gs.push({ad: cmd.ad, tu: cmd.tu.toString(), gu: "15", od: false, taksitId: ""});
+                    }
+
+                    return db.collection("kullanici_verileri").doc(aktifId).collection("donemler").doc(donemKod).set({giderler: gs, gelirler: gl, gelatinler: gl});
                 });
+                promises.push(p);
+            }
+
+            Promise.all(promises).then(() => {
+                aiMesajBas(`✅ <b>[BAŞARILI]:</b> ${aylarIsimleri[sMonth]} ve ${aylarIsimleri[eMonth]} ayları dahil olmak üzere tüm dönemler güncellendi ve yeniden hesaplandı!`, 'ai');
+                verileriCek(); // Aktif arayüzü yenile
+            }).catch(e => {
+                aiMesajBas(`❌ <b>[HATA]:</b> Toplu işlem yapılırken bir sorun oluştu.`, 'ai');
             });
         }
     }
