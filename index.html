@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Bütçe Takip Pro v13</title>
+    <title>Bütçe Takip Pro v14</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
     <style>
@@ -53,6 +53,8 @@
         .sum-line.total { border-bottom: none; font-size: 16px; font-weight: bold; color: var(--danger); }
         .btn-add { width: 100%; padding: 12px; border: none; background: #fff; color: var(--accent); font-weight: bold; cursor: pointer; }
         .btn-copy { font-size: 10px; background: var(--accent); color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
+        .btn-clear-all { font-size: 14px; background: none; border: none; color: var(--danger); cursor: pointer; font-weight: bold; padding: 0 5px; }
+        .btn-undo { font-size: 10px; background: #7f8c8d; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; margin-right: 5px; }
     </style>
 </head>
 <body>
@@ -74,6 +76,7 @@
     <div class="nav">
         <span id="user-display" style="font-size:10px;">...</span>
         <div>
+            <button class="btn-undo" onclick="geriAl()" title="Son işlemi geri al">↩ Geri Al</button>
             <select id="y-sel" onchange="verileriCek()"></select>
             <select id="m-sel" onchange="verileriCek()"></select>
         </div>
@@ -91,7 +94,10 @@
     </div>
 
     <div class="section-header" style="color:var(--danger)">
-        <span>📉 GİDERLER</span>
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <span>📉 GİDERLER</span>
+            <button class="btn-clear-all" onclick="tumGiderleriSil()" title="Bu ayın tüm giderlerini sil">🗑️</button>
+        </div>
         <button class="btn-copy" onclick="gecenAyiKopyala()">Geçen Ayı Kopyala</button>
     </div>
     <div class="row g-row head-cell" style="background:#f9f9f9; min-height:25px;">
@@ -124,6 +130,9 @@
     const db = firebase.firestore();
     let isLogMode = true;
     let aktifId = "";
+    
+    // Geri alma (Undo) geçmişi için hafıza dizisi
+    let geçmişHafıza = [];
 
     function modDegis() {
         isLogMode = !isLogMode;
@@ -171,6 +180,44 @@
         m.value = new Date().getMonth(); y.value = new Date().getFullYear();
     };
 
+    // Değişiklik yapılmadan hemen önceki anı hafızaya kaydeder
+    function hafizayaKaydet() {
+        const gids = [], gels = [];
+        document.querySelectorAll('#g-list .row-item').forEach(r => {
+            gids.push({
+                ad: r.querySelector('.in-ad').value,
+                tu: r.querySelector('.in-tu').value,
+                gu: r.querySelector('.in-gu').value,
+                od: r.querySelector('.in-od').checked
+            });
+        });
+        document.querySelectorAll('#gel-list .row-item').forEach(r => {
+            gels.push({
+                ad: r.querySelector('.in-ad').value,
+                tu: r.querySelector('.in-tu').value
+            });
+        });
+        
+        geçmişHafıza.push({ giderler: gids, gelirler: gels });
+        if (geçmişHafıza.length > 20) geçmişHafıza.shift(); // Son 20 işlemi koru
+    }
+
+    function geriAl() {
+        if (geçmişHafıza.length === 0) { alert("Geri alınacak işlem bulunamadı!"); return; }
+        const sonDurum = geçmişHafıza.pop();
+        
+        document.getElementById('g-list').innerHTML = "";
+        document.getElementById('gel-list').innerHTML = "";
+        
+        sonDurum.giderler.forEach(x => satirBas('gider', x));
+        sonDurum.gelirler.forEach(x => satirBas('gelir', x));
+        
+        // Firebase senkronizasyonu
+        if(!aktifId) return;
+        const donem = document.getElementById('y-sel').value + "_" + document.getElementById('m-sel').value;
+        db.collection("kullanici_verileri").doc(aktifId).collection("donemler").doc(donem).set({giderler: sonDurum.giderler, gelirler: sonDurum.gelirler}).then(hesapla);
+    }
+
     function verileriKaydet() {
         if(!aktifId) return;
         siralaArayuz();
@@ -197,6 +244,8 @@
     }
 
     function verileriCek(uyari = false) {
+        // Dönem değiştiğinde eski dönemin geçmiş hafızasını temizle
+        geçmişHafıza = [];
         const donem = document.getElementById('y-sel').value + "_" + document.getElementById('m-sel').value;
         db.collection("kullanici_verileri").doc(aktifId).collection("donemler").doc(donem).get().then(doc => {
             document.getElementById('g-list').innerHTML = "";
@@ -223,18 +272,36 @@
     function satirBas(tip, v={ad:'', tu:'', gu:'', od:false}) {
         const id = "r" + Math.random().toString(36).substr(2,7);
         const html = `<div class="row ${tip==='gider'?'g-row':'gel-row'} row-item" id="${id}">
-            <div class="cell"><input type="text" class="table-input in-ad" value="${v.ad}" placeholder="Açıklama" onchange="taksitCheck('${id}','${tip}')"></div>
-            <div class="cell"><input type="number" class="table-input in-tu" value="${v.tu}" placeholder="0" onchange="verileriKaydet()"></div>
+            <div class="cell"><input type="text" class="table-input in-ad" value="${v.ad}" placeholder="Açıklama" onfocus="hafizayaKaydet()" onchange="taksitCheck('${id}','${tip}')"></div>
+            <div class="cell"><input type="number" class="table-input in-tu" value="${v.tu}" placeholder="0" onfocus="hafizayaKaydet()" onchange="verileriKaydet()"></div>
             ${tip==='gider' ? `
-            <div class="cell"><input type="number" class="table-input in-gu" value="${v.gu}" placeholder="Gün" onchange="verileriKaydet()"></div>
-            <div class="cell" style="justify-content:center"><input type="checkbox" class="in-od" ${v.od?'checked':''} onchange="verileriKaydet()"></div>` : ''}
+            <div class="cell"><input type="number" class="table-input in-gu" value="${v.gu}" placeholder="Gün" onfocus="hafizayaKaydet()" onchange="verileriKaydet()"></div>
+            <div class="cell" style="justify-content:center"><input type="checkbox" class="in-od" ${v.od?'checked':''} onchange="hafizayaKaydet(); verileriKaydet()"></div>` : ''}
             <div class="cell"><button class="del-btn" onclick="satirSil('${id}')">×</button></div>
         </div>`;
         document.getElementById(tip==='gider'?'g-list':'gel-list').insertAdjacentHTML('beforeend', html);
     }
 
-    function satirEkle(tip) { satirBas(tip); verileriKaydet(); }
-    function satirSil(id) { if(confirm("Silmek istiyor musunuz?")) { document.getElementById(id).remove(); verileriKaydet(); } }
+    function satirEkle(tip) { hafizayaKaydet(); satirBas(tip); verileriKaydet(); }
+    
+    function satirSil(id) { 
+        if(confirm("Silmek istiyor musunuz?")) { 
+            hafizayaKaydet(); 
+            document.getElementById(id).remove(); 
+            verileriKaydet(); 
+        } 
+    }
+
+    function tumGiderleriSil() {
+        if(confirm("⚠️ UYARI: Bu ayki TÜM GİDERLERİ tek seferde silmek istediğinize emin misiniz?")) {
+            if(confirm("Son onay: Bu işlem o aya ait tüm taksitleri de bu listeden temizleyecektir!")) {
+                hafizayaKaydet();
+                document.getElementById('g-list').innerHTML = "";
+                verileriKaydet();
+                alert("Bu aya ait tüm giderler temizlendi. İsterseniz yukarıdan 'Geri Al' yapabilirsiniz.");
+            }
+        }
+    }
 
     function gecenAyiKopyala() {
         if(!confirm("Geçen ayın gider ve gelirlerini bu aya kopyalamak istediğine emin misin? (Mevcut taksitli harcamalarınız korunacaktır)")) return;
@@ -252,6 +319,7 @@
 
         db.collection("kullanici_verileri").doc(aktifId).collection("donemler").doc(gecenDonem).get().then(doc => {
             if(doc.exists) {
+                hafizayaKaydet();
                 const d = doc.data();
                 const taksitRegex = /\(\d+\/\d+\)$/;
 
@@ -288,17 +356,16 @@
         if(confirm(`"${ad}" harcamasını taksitlendirmek ister misiniz?`)) {
             const n = parseInt(prompt("Kaç ay?"));
             if(n > 1) {
+                hafizayaKaydet();
                 const tu = r.querySelector('.in-tu').value, gu = r.querySelector('.in-gu').value;
                 const sy = document.getElementById('y-sel').value, sm = document.getElementById('m-sel').value;
                 for(let i=0; i<n; i++) {
                     let m = parseInt(sm)+i, y = parseInt(sy); if(m>11) { y += Math.floor(m/12); m = m%12; }
                     const dk = `${y}_${m}`, ta = `${ad} (${i+1}/${n})`;
                     
-                    // Gelecek aylara ait dokümanı çekip güncelliyoruz
                     db.collection("kullanici_verileri").doc(aktifId).collection("donemler").doc(dk).get().then(doc => {
                         let gs = doc.exists ? (doc.data().giderler || []) : [];
                         if(!gs.some(x => x.ad === ta)) {
-                            // HATA DÜZELTİLDİ: tu (tutar) ve gu (gün) bilgileri de objeye eklenerek sonraki aylara gönderiliyor.
                             gs.push({ad: ta, tu: tu, gu: gu, od: false});
                             db.collection("kullanici_verileri").doc(aktifId).collection("donemler").doc(dk).set({giderler:gs, gelirler:(doc.exists?doc.data().gelirler:[])});
                         }
