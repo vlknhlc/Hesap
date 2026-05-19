@@ -3,17 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Bütçe Takip Pro v20</title>
+    <title>Bütçe Takip Pro v21</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
     <style>
         :root { 
             --primary: #2c3e50; --accent: #3498db; --danger: #e74c3c; --success: #27ae60; --warning: #f39c12;
             --bg: #f4f7f6; --row-bg: #ffffff; --border: #dfe6e9;
-            /* Yeni Pastel Satır Renkleri */
-            --row-success: #e8f5e9;
-            --row-danger: #ffebee;
-            --row-warning: #fffde7;
+            --row-success: #e8f5e9; --row-danger: #ffebee; --row-warning: #fffde7;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
         body { background: var(--bg); padding: 5px; }
@@ -39,7 +36,7 @@
         .progress-bg { width: 100%; height: 12px; background: #eee; border-radius: 10px; overflow: hidden; }
         #progress-bar { height: 100%; width: 0%; background: var(--success); transition: 0.5s; }
 
-        /* Tablo ve Excel Görünümü */
+        /* Tablo Görünümü */
         .section-header { background: #f8f9fa; padding: 10px; font-weight: bold; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
         .row { display: grid; border-bottom: 1px solid var(--border); align-items: center; min-height: 48px; background: var(--row-bg); transition: background-color 0.3s; }
         .g-row { grid-template-columns: 1fr 80px 50px 35px 30px 30px; }
@@ -55,10 +52,21 @@
         .taksit-btn { background: none; border: none; color: var(--accent); font-size: 14px; cursor: pointer; width: 100%; filter: grayscale(0.2); }
         .taksit-btn:hover { filter: grayscale(0); transform: scale(1.1); }
         
-        .summary { padding: 15px; background: #fdfdfd; }
+        /* Özet Alanları */
+        .summary { padding: 15px; background: #fdfdfd; border-bottom: 4px solid var(--border); }
         .sum-line { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #eee; font-size: 14px; }
         .sum-line.total { font-size: 15px; font-weight: bold; color: var(--danger); }
         .sum-line.denge { border-top: 2px dashed var(--border); border-bottom: none; font-size: 17px; font-weight: 800; padding-top: 10px; margin-top: 5px; }
+        
+        /* Yeni Yıllık Kart Yapısı */
+        .yillik-container { padding: 15px; background: #fcfcfc; }
+        .yillik-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 2px solid var(--primary); padding-bottom: 8px; color: var(--primary); font-weight: bold; }
+        .yillik-header select { padding: 4px 8px; font-weight: bold; border-radius: 4px; border: 1px solid var(--primary); }
+        .aylik-kart { background: white; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; padding: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+        .aylik-kart-baslik { font-size: 15px; font-weight: bold; color: var(--primary); border-bottom: 1px dashed #eee; padding-bottom: 4px; margin-bottom: 6px; display: flex; justify-content: space-between; }
+        .aylik-kart-detay { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 12px; color: #555; }
+        .aylik-kart-detay div span { font-weight: bold; color: #222; }
+
         .btn-add { width: 100%; padding: 12px; border: none; background: #fff; color: var(--accent); font-weight: bold; cursor: pointer; }
         .btn-copy { font-size: 10px; background: var(--accent); color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
         .btn-clear-all { font-size: 14px; background: none; border: none; color: var(--danger); cursor: pointer; font-weight: bold; padding: 0 5px; }
@@ -124,6 +132,15 @@
         <div class="sum-line total"><span>ÖDENECEK KALAN (Açık Giderler):</span> <span id="res-kalan">0 TL</span></div>
         <div class="sum-line denge"><span>AYLIK NET DENGE:</span> <span id="res-denge">0 TL</span></div>
     </div>
+
+    <div class="yillik-container">
+        <div class="yillik-header">
+            <span>📅 YILLIK FİNANSAL RAPOR</span>
+            <select id="yillik-y-sel" onchange="yillikRaporHesapla()"></select>
+        </div>
+        <div id="yillik-rapor-listesi">
+            </div>
+    </div>
 </div>
 
 <script>
@@ -140,6 +157,7 @@
     let isLogMode = true;
     let aktifId = "";
     let geçmişHafıza = [];
+    const aylarIsimleri = ["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
 
     function modDegis() {
         isLogMode = !isLogMode;
@@ -181,10 +199,15 @@
     }
 
     window.onload = function() {
-        const m = document.getElementById('m-sel'), y = document.getElementById('y-sel');
-        ["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"].forEach((n,i)=>m.add(new Option(n,i)));
-        for(let i=2025;i<=2030;i++) y.add(new Option(i,i));
-        m.value = new Date().getMonth(); y.value = new Date().getFullYear();
+        const m = document.getElementById('m-sel'), y = document.getElementById('y-sel'), yy = document.getElementById('yillik-y-sel');
+        aylarIsimleri.forEach((n,i)=>m.add(new Option(n,i)));
+        for(let i=2025;i<=2030;i++) {
+            y.add(new Option(i,i));
+            yy.add(new Option(i,i));
+        }
+        m.value = new Date().getMonth(); 
+        y.value = new Date().getFullYear();
+        yy.value = new Date().getFullYear();
     };
 
     function hafizayaKaydet() {
@@ -297,7 +320,7 @@
             </div>`;
         }
         document.getElementById(tip==='gider'?'g-list':'gel-list').insertAdjacentHTML('beforeend', html);
-        if(tip === 'gider') satirlariRenklendir(); // Yeni basılan satırı da anlık kontrol et
+        if(tip === 'gider') satirlariRenklendir();
     }
 
     function satirEkle(tip) { hafizayaKaydet(); satirBas(tip); verileriKaydet(); }
@@ -471,14 +494,11 @@
         }
     }
 
-    // YENİ ÖZELLİK: Dinamik Satır Renklendirme Filtresi
     function satirlariRenklendir() {
         const bugunTS = new Date();
         const bugunGun = bugunTS.getDate();
         const aktifYil = parseInt(document.getElementById('y-sel').value);
         const aktifAy = parseInt(document.getElementById('m-sel').value);
-        
-        // Gerçek zamanlı tarih kontrolü için şu anki ay/yıl bilgisi
         const gercekAy = bugunTS.getMonth();
         const gercekYil = bugunTS.getFullYear();
 
@@ -486,37 +506,90 @@
             const isChecked = r.querySelector('.in-od').checked;
             const girilenGun = parseInt(r.querySelector('.in-gu').value) || 0;
 
-            // 1. Durum: Ödenmişse direkt şık bir pastel yeşil yap
-            if (isChecked) {
-                r.style.backgroundColor = "var(--row-success)";
-                return;
-            }
+            if (isChecked) { r.style.backgroundColor = "var(--row-success)"; return; }
+            if (girilenGun <= 0) { r.style.backgroundColor = "var(--row-bg)"; return; }
 
-            // Eğer gün girilmemişse veya geçmiş/gelecek yıla bakıyorsak rengi sıfırla
-            if (girilenGun <= 0) {
-                r.style.backgroundColor = "var(--row-bg)";
-                return;
-            }
-
-            // Sadece içinde bulunduğumuz geçerli ay/yıl için gün bazlı kontrol yap
             if (aktifYil === gercekYil && aktifAy === gercekAy) {
-                if (bugunGun > girilenGun) {
-                    // 2. Durum: Günü geçmiş ve ödenmemişse pastel kırmızı
-                    r.style.backgroundColor = "var(--row-danger)";
-                } else if (girilenGun - bugunGun <= 3) {
-                    // 3. Durum: Ödemeye son 3 gün kalmış veya bugünse pastel sarı
-                    r.style.backgroundColor = "var(--row-warning)";
-                } else {
-                    // Gelecek günlerdeyse standart beyaz kalır
-                    r.style.backgroundColor = "var(--row-bg)";
-                }
+                if (bugunGun > girilenGun) { r.style.backgroundColor = "var(--row-danger)"; }
+                else if (girilenGun - bugunGun <= 3) { r.style.backgroundColor = "var(--row-warning)"; }
+                else { r.style.backgroundColor = "var(--row-bg)"; }
             } else if (aktifYil < gercekYil || (aktifYil === gercekYil && aktifAy < gercekAy)) {
-                // Eğer tamamen geçmiş bir aya bakıyorsak ve ödenmemiş satır kalmışsa direkt kırmızı göster
                 r.style.backgroundColor = "var(--row-danger)";
             } else {
-                // Tamamen gelecekteki bir aysa normal beyaz kalır
                 r.style.backgroundColor = "var(--row-bg)";
             }
+        });
+    }
+
+    // YENİ ÖZELLİK: Arka planda 12 ayı Firebase'den tek tıkla tarayıp özet tabloyu basan fonksiyon
+    function yillikRaporHesapla() {
+        if(!aktifId) return;
+        const raporYili = document.getElementById('yillik-y-sel').value;
+        const container = document.getElementById('yillik-rapor-listesi');
+        container.innerHTML = `<div style="text-align:center; padding:20px; font-size:12px; color:#666;">📊 Rapor verileri yükleniyor...</div>`;
+
+        const aylarPromise = [];
+
+        // 12 aya ait tüm döküman isteklerini sırayla sıraya koyuyoruz
+        for(let m=0; m<12; m++) {
+            const donemKod = raporYili + "_" + m;
+            aylarPromise.push(db.collection("kullanici_verileri").doc(aktifId).collection("donemler").doc(donemKod).get());
+        }
+
+        Promise.all(aylarPromise).then(docs => {
+            container.innerHTML = ""; // Yükleniyor yazısını kaldır
+
+            docs.forEach((doc, mIndex) => {
+                let tGel = 0, tGid = 0, tKal = 0;
+
+                if (doc.exists) {
+                    const data = doc.data();
+                    // Gelir hesabı
+                    const nGelir = data.gelirler || data.gelatinler || [];
+                    nGelir.forEach(x => tGel += parseFloat(x.tu) || 0);
+
+                    // Gider hesabı
+                    if (data.giderler) {
+                        data.giderler.forEach(x => {
+                            const tu = parseFloat(x.tu) || 0;
+                            tGid += tu;
+                            if (!x.od) tKal += tu; // Tik atılmamışsa kalan ödemeye ekle
+                        });
+                    }
+                }
+
+                const netDenge = tGel - tGid;
+                let dengeStili = "color:var(--primary);";
+                let dengeMetni = "0 TL";
+
+                if (netDenge > 0) {
+                    dengeStili = "color:var(--success); font-weight:bold;";
+                    dengeMetni = "+ " + netDenge.toLocaleString('tr-TR') + " TL";
+                } else if (netDenge < 0) {
+                    dengeStili = "color:var(--danger); font-weight:bold;";
+                    dengeMetni = "- " + Math.abs(netDenge).toLocaleString('tr-TR') + " TL";
+                }
+
+                // Ay kartını oluştur ve listeye bas
+                const kartHtml = `
+                    <div class="aylik-kart">
+                        <div class="aylik-kart-baslik">
+                            <span>📅 ${aylarIsimleri[mIndex]}</span>
+                            <span style="${dengeStili}">${dengeMetni}</span>
+                        </div>
+                        <div class="aylik-kart-detay">
+                            <div>Gelir: <span style="color:var(--success)">${tGel.toLocaleString('tr-TR')} TL</span></div>
+                            <div>Gider: <span style="color:var(--danger)">${tGid.toLocaleString('tr-TR')} TL</span></div>
+                            <div style="grid-column: span 2; margin-top: 2px; border-top: 1px dotted #eee; padding-top: 2px;">
+                                Ödenecek Kalan (Açık Gider): <span>${tKal.toLocaleString('tr-TR')} TL</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.insertAdjacentHTML('beforeend', kartHtml);
+            });
+        }).catch(err => {
+            container.innerHTML = `<div style="color:var(--danger); text-align:center; font-size:12px;">Rapor yüklenirken hata oluştu!</div>`;
         });
     }
 
@@ -558,8 +631,10 @@
         else if(oran < 90) bar.style.background = "var(--warning)";
         else bar.style.background = "var(--danger)";
 
-        // YENİ: Her veri değiştiğinde satırların renk durumunu güncelle
         satirlariRenklendir();
+        
+        // YENİ: Üst tarafta bütçe değiştikçe alt taraftaki raporu da tetikle ki veriler anlık senkron kalsın
+        yillikRaporHesapla();
     }
 </script>
 </body>
