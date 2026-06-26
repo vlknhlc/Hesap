@@ -150,10 +150,12 @@
 </div>
 
 <script>
-    // Gerçek ve %100 Doğrulanmış Supabase Bağlantı Bilgileri
+    // Supabase Doğru Bağlantı Parametreleri (Çift tanımlamalar tamamen temizlendi)
     const SUPABASE_URL = "https://itmjtoevsxvpzphnxauc.supabase.co"; 
     const SUPABASE_ANON_KEY = "EyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml0bWp0b2V2c3h2cHpwaG54YXVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0OTA1NDYsImV4cCI6MjA5ODA2NjU0Nn0.MBvdsBKeQgoNZbAf5hFaJ957EN_nb-Zj3D17ySSdLkw"; 
-    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    
+    // Uygulama genelinde sadece tek bir supabase istemcisi oluşturuluyor
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     // Sayfa Yüklendiğinde Oturum Kontrolü yap
     window.onload = function() {
@@ -182,8 +184,8 @@
                 .eq('username', uName);
 
             if (error) {
-                console.error("Supabase Hatası:", error);
-                alert("Bağlantı Hatası: " + error.message);
+                console.error("Bağlantı Hatası:", error);
+                alert("Veritabanı Hatası: " + error.message);
                 return;
             }
 
@@ -201,8 +203,8 @@
                 alert("Hatalı şifre!");
             }
         } catch (err) {
-            console.error("Beklenmedik Hata:", err);
-            alert("Sistemde teknik bir arıza oluştu.");
+            console.error("Hata:", err);
+            alert("Sistemde beklenmeyen bir arıza oluştu.");
         }
     }
 
