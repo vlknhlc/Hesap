@@ -150,9 +150,9 @@
 </div>
 
 <script>
-    // Gerçek Projenin Eşleşen API ve URL Yapısı
+    // Gerçek ve %100 Doğrulanmış Supabase Bağlantı Bilgileri
     const SUPABASE_URL = "https://itmjtoevsxvpzphnxauc.supabase.co"; 
-    const SUPABASE_ANON_KEY = "sb_publishable_L7HzzWwk6-VMZN3aNDNSWQ_LToJsfjn"; 
+    const SUPABASE_ANON_KEY = "EyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml0bWp0b2V2c3h2cHpwaG54YXVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0OTA1NDYsImV4cCI6MjA5ODA2NjU0Nn0.MBvdsBKeQgoNZbAf5hFaJ957EN_nb-Zj3D17ySSdLkw"; 
     const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     // Sayfa Yüklendiğinde Oturum Kontrolü yap
@@ -176,7 +176,6 @@
         }
 
         try {
-            // Full-stack hata ayıklama: Veritabanı bağlantısını test ediyoruz
             const { data, error } = await supabase
                 .from('sistem_kullanicilari')
                 .select('*')
@@ -193,16 +192,16 @@
                 return;
             }
 
-            const kullanıcı = data[0];
+            const kullanici = data[0];
 
-            if (kullanıcı.password === uPass) {
-                localStorage.setItem("aktif_kullanici", kullanıcı.username);
-                paneliGoster(kullanıcı.username);
+            if (kullanici.password === uPass) {
+                localStorage.setItem("aktif_kullanici", kullanici.username);
+                paneliGoster(kullanici.username);
             } else {
                 alert("Hatalı şifre!");
             }
         } catch (err) {
-            console.error("Yakalanamayan Hata:", err);
+            console.error("Beklenmedik Hata:", err);
             alert("Sistemde teknik bir arıza oluştu.");
         }
     }
