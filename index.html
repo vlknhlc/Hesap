@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bütçe Takip Sistemi</title>
-    <!-- Supabase JS Kütüphanesi -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -95,7 +94,6 @@
 <body>
 
 <div class="container">
-    <!-- GİRİŞ EKRANI -->
     <div id="loginSection" class="card">
         <h2>ButceTakip Giriş</h2>
         <input type="text" id="loginUsername" placeholder="Kullanıcı Adı" required>
@@ -103,21 +101,18 @@
         <button onclick="kullaniciGiris()">Giriş Yap</button>
     </div>
 
-    <!-- ANA UYGULAMA PANELİ -->
     <div id="appSection" class="hidden">
         <div class="card" style="display: flex; justify-content: space-between; align-items: center;">
             <h2>Hoş geldin, <span id="userDisplay"></span>!</h2>
             <button onclick="cikisYap()" class="logout-btn" style="width: auto;">Çıkış Yap</button>
         </div>
 
-        <!-- BÜTÇE ÖZET KUTULARI -->
         <div class="ozet-grid">
             <div class="ozet-kutu gelir-kutu">Toplam Gelir: <span id="toplamGelir">0</span> TL</div>
             <div class="ozet-kutu gider-kutu">Toplam Gider: <span id="toplamGider">0</span> TL</div>
             <div class="ozet-kutu kalan-kutu">Net Kalan: <span id="netKalan">0</span> TL</div>
         </div>
 
-        <!-- YENİ VERİ EKLEME FORMU -->
         <div class="card">
             <h3>Yeni İşlem Ekle</h3>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
@@ -133,7 +128,6 @@
             <button onclick="yeniVeriEkle()">Kaydet</button>
         </div>
 
-        <!-- İŞLEMLER LİSTESİ -->
         <div class="card">
             <h3>İşlem Geçmişi</h3>
             <div style="overflow-x: auto;">
@@ -148,8 +142,7 @@
                         </tr>
                     </thead>
                     <tbody id="islemListesi">
-                        <!-- Veriler dinamik olarak buraya gelecek -->
-                    </tbody>
+                        </tbody>
                 </table>
             </div>
         </div>
@@ -157,7 +150,7 @@
 </div>
 
 <script>
-    // Supabase Doğru Bağlantı Bilgileri
+    // Gerçek Projenin Eşleşen API ve URL Yapısı
     const SUPABASE_URL = "https://itmjtoevsxvpzphnxauc.supabase.co"; 
     const SUPABASE_ANON_KEY = "sb_publishable_L7HzzWwk6-VMZN3aNDNSWQ_LToJsfjn"; 
     const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -183,26 +176,34 @@
         }
 
         try {
+            // Full-stack hata ayıklama: Veritabanı bağlantısını test ediyoruz
             const { data, error } = await supabase
                 .from('sistem_kullanicilari')
                 .select('*')
-                .eq('username', uName)
-                .single();
+                .eq('username', uName);
 
-            if (error || !data) {
+            if (error) {
+                console.error("Supabase Hatası:", error);
+                alert("Bağlantı Hatası: " + error.message);
+                return;
+            }
+
+            if (!data || data.length === 0) {
                 alert("Kullanıcı adı bulunamadı!");
                 return;
             }
 
-            if (data.password === uPass) {
-                localStorage.setItem("aktif_kullanici", data.username);
-                paneliGoster(data.username);
+            const kullanıcı = data[0];
+
+            if (kullanıcı.password === uPass) {
+                localStorage.setItem("aktif_kullanici", kullanıcı.username);
+                paneliGoster(kullanıcı.username);
             } else {
                 alert("Hatalı şifre!");
             }
         } catch (err) {
-            console.error(err);
-            alert("Giriş esnasında bir hata meydana geldi.");
+            console.error("Yakalanamayan Hata:", err);
+            alert("Sistemde teknik bir arıza oluştu.");
         }
     }
 
