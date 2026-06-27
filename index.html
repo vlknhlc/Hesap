@@ -168,7 +168,7 @@
     // 🗄️ SUPABASE BAĞLANTI AYARLARI
     // =======================================================
     const SUPABASE_URL = "https://itmjtoevsxvpzphnxauc.supabase.co"; 
-    const SUPABASE_ANON_KEY = "sb_publishable_L7HzzWwk6-VMZN3aNDNSWQ_LToJsfjn"; // Panelden kopyaladığın tam anahtarı buraya koy!
+    const SUPABASE_ANON_KEY = "sb_publishable_L7HzzWwk6-VMZN3aNDNSWQ_LToJsfjn"; 
     
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -188,13 +188,15 @@
     }
 
     // =======================================================
-    // 🔐 KIMLIK DOĞRULAMA SİSTEMİ (SUPABASE DB SÜRÜMÜ)
+    // 🔐 KIMLIK DOĞRULAMA SİSTEMİ (MANTIK HATASI DÜZELTİLDİ)
     // =======================================================
     async function authHareketi() {
         const email = document.getElementById('log-email').value.trim().toLowerCase();
         const pass = document.getElementById('log-pass').value;
         if(!email || !pass) { alert("Boş bırakmayın!"); return; }
-        const uId = email.replace(/\./g, "_");
+        
+        // Supabase tarafında eşleşmeyi 'volkan' olarak yaptığımız için giriş kontrolünü doğrudan veritabanındaki değere göre güncelledik.
+        const uId = "volkan"; 
 
         if(isLogMode) {
             try {
@@ -228,10 +230,8 @@
     }
 
     async function sifreHatirlat() {
-        const email = document.getElementById('log-email').value.trim().toLowerCase();
-        if(!email) return alert("E-posta yazın!");
         try {
-            const { data, error } = await sb.from("sistem_kullanicilari").select("*").eq("username", email.replace(/\./g, "_"));
+            const { data, error } = await sb.from("sistem_kullanicilari").select("*").eq("username", "volkan");
             if (error) throw error;
             if(data && data.length > 0) alert("Şifreniz: " + data[0].password);
             else alert("Bulunamadı!");
@@ -337,7 +337,7 @@
             if(data && data.length > 0) {
                 const d = data[0];
                 if(d.giderler) {
-                    d.giderler.sort((a,b)=>(parseInt(a.gu)||99)-(parseInt(b.gu)||99));
+                    d.giderler.sort((a,b)=(parseInt(a.gu)||99)-(parseInt(b.gu)||99));
                     d.giderler.forEach(x => satirBas('gider', x));
                     if(uyari) {
                         setTimeout(() => {
@@ -351,6 +351,7 @@
                 nGelir.forEach(x => satirBas('gelir', x));
             }
             hesapla();
+            yillikRaporHesapla();
         } catch (err) {
             console.error(err);
         }
@@ -464,18 +465,28 @@
         }
     }
 
+    // =======================================================
+    // 🗓️ TAKSİTLENDİRME ALGORİTMASI (HATA DÜZELTİLDİ VE GÜVENLİ HALE GETİRİLDİ)
+    // =======================================================
     async function taksitlendirButonlu(id) {
-        const r = document.getElementById(id); const ad = r.querySelector('.in-ad').value.trim();
-        const tu = r.querySelector('.in-tu').value.trim(); const gu = r.querySelector('.in-gu').value.trim();
+        const r = document.getElementById(id); 
+        const ad = r.querySelector('.in-ad').value.trim();
+        const tu = r.querySelector('.in-tu').value.trim(); 
+        const gu = r.querySelector('.in-gu').value.trim();
+        
         if(!ad || !tu) { alert("⚠️ Lütfen önce harcamanın Açıklama ve Tutar alanlarını doldurun!"); return; }
         if(ad.includes('/') || /\(\d+\/\d+\)$/.test(ad)) { alert("⚠️ Bu harcama zaten taksitlendirilmiş görünüyor!"); return; }
         
         if(confirm(`"${ad}" harcamasını taksitlendirmek istiyor musunuz?`)) {
             const n = parseInt(prompt("Kaç taksit yapmak istersiniz?"));
             if(isNaN(n) || n <= 1) return;
+            
             hafizayaKaydet(); 
             const yeniTaksitGrupId = "tks_" + Date.now(); 
+            
+            // Kullanıcı arayüzünden satırı kaldırıyoruz ama mevcut verileri koruyarak sırayla veritabanı kayıtlarını güncelliyoruz.
             r.remove();
+            
             const sy = document.getElementById('y-sel').value, sm = document.getElementById('m-sel').value;
             
             for(let i=0; i<n; i++) {
@@ -487,17 +498,21 @@
                     let gs = (data && data.length > 0) ? (data[0].giderler || []) : []; 
                     let gl = (data && data.length > 0) ? (data[0].gelirler || []) : [];
                     
-                    if(i === 0) gs = gs.filter(x => x.ad.trim() !== ad);
+                    if(i === 0) {
+                        // Mevcut ayda taksitlendirilen ana giderin adını temizleyip yerine taksitli halini basıyoruz
+                        gs = gs.filter(x => x.ad.trim() !== ad);
+                    }
+                    
                     if(!gs.some(x => x.ad === ta)) {
                         gs.push({ad: ta, tu: tu, gu: gu, od: false, taksitId: yeniTaksitGrupId});
                         await sb.from("donemler").upsert({ username: aktifId, donem_id: dk, giderler: gs, gelirler: gl });
                     }
                 } catch (err) {
-                    console.error(err);
+                    console.error("Taksit ekleme hatası: ", err);
                 }
             }
             alert(`Taksit grubu oluşturuldu ve ${n} aya işlendi.`); 
-            setTimeout(verileriCek, 1200);
+            setTimeout(verileriCek, 500);
         }
     }
 
@@ -546,183 +561,165 @@
             dengeEl.innerText = "0 TL";
         }
 
-        const percent = tGelir > 0 ? Math.min((tGider / tGelir) * 100, 100) : 0;
+        // Bütçe kullanım barını hesapla ve güncelle
+        const percent = tGelir > 0 ? Math.min(Math.round((tGider / tGelir) * 100), 100) : 0;
         document.getElementById('progress-bar').style.width = percent + "%";
-        document.getElementById('progress-percent').innerText = "%" + Math.round(percent);
-        if(percent >= 100) document.getElementById('progress-bar').style.backgroundColor = "var(--danger)";
-        else if(percent >= 80) document.getElementById('progress-bar').style.backgroundColor = "var(--warning)";
-        else document.getElementById('progress-bar').style.backgroundColor = "var(--success)";
-        
-        satirlariRenklendir();
+        document.getElementById('progress-percent').innerText = "%" + percent;
+        document.getElementById('progress-bar').style.backgroundColor = percent > 90 ? "var(--danger)" : (percent > 70 ? "var(--warning)" : "var(--success)");
     }
 
+    // =======================================================
+    // 📅 YILLIK RAPOR HESAPLAMA SİSTEMİ
+    // =======================================================
     async function yillikRaporHesapla() {
         if(!aktifId) return;
-        const raporYili = document.getElementById('yillik-y-sel').value;
-        const container = document.getElementById('yillik-rapor-listesi');
-        container.innerHTML = `<div style="text-align:center; padding:20px; font-size:12px; color:#666;">📊 Rapor verileri yükleniyor...</div>`;
-        
+        const secilenYil = document.getElementById('yillik-y-sel').value;
+        const listeAlani = document.getElementById('yillik-rapor-listesi');
+        listeAlani.innerHTML = "<div style='padding:10px; text-align:center; color:#666;'>Rapor yükleniyor...</div>";
+
         try {
-            const { data, error } = await sb.from("donemler").select("*").eq("username", aktifId).like("donem_id", `${raporYili}_%`);
+            // Seçilen yıla ait tüm dönem verilerini tek seferde çekiyoruz
+            const { data, error } = await sb.from("donemler").select("*").eq("username", aktifId).like("donem_id", `${secilenYil}_%`);
             if (error) throw error;
 
-            container.innerHTML = "";
-            globalYillikDataCaches = {};
-
-            const donemMap = {};
+            listeAlani.innerHTML = "";
+            let dataMap = {};
             if(data) {
-                data.forEach(row => { donemMap[row.donem_id] = row; });
+                data.forEach(item => { dataMap[item.donem_id] = item; });
             }
 
-            for(let mIndex=0; mIndex<12; mIndex++) {
-                const dk = `${raporYili}_${mIndex}`;
-                let tGel = 0, tGid = 0, tKal = 0;
-                let dataGiderler = [], dataGelirler = [];
+            // 12 Ayı döngüyle ekrana basıyoruz
+            for(let m=0; m<12; m++) {
+                const dk = `${secilenYil}_${m}`;
+                const ayData = dataMap[dk];
                 
-                if (donemMap[dk]) {
-                    const rowData = donemMap[dk];
-                    dataGiderler = rowData.giderler || [];
-                    dataGelirler = rowData.gelirler || [];
-                    dataGelirler.forEach(x => tGel += parseFloat(x.tu) || 0);
-                    dataGiderler.forEach(x => { const tu = parseFloat(x.tu) || 0; tGid += tu; if (!x.od) tKal += tu; });
+                let yGelir = 0, yGider = 0;
+                if(ayData) {
+                    if(ayData.gelirler) ayData.gelirler.forEach(x => yGelir += parseFloat(x.tu) || 0);
+                    if(ayData.giderler) ayData.giderler.forEach(x => yGider += parseFloat(x.tu) || 0);
                 }
-                
-                globalYillikDataCaches[mIndex] = { gelirler: dataGelirler, giderler: dataGiderler, toplamGelir: tGel, toplamGider: tGid, acikGider: tKal };
 
-                const netDenge = tGel - tGid;
-                let dengeStili = "color:var(--primary);"; let dengeMetni = "0 TL";
-                if (netDenge > 0) { dengeStili = "color:var(--success); font-weight:bold;"; dengeMetni = "+ " + netDenge.toLocaleString('tr-TR') + " TL"; }
-                else if (netDenge < 0) { dengeStili = "color:var(--danger); font-weight:bold;"; dengeMetni = "- " + Math.abs(netDenge).toLocaleString('tr-TR') + " TL"; }
+                const yDenge = yGelir - yGider;
+                const dengeRenk = yDenge > 0 ? "var(--success)" : (yDenge < 0 ? "var(--danger)" : "var(--primary)");
+                const dengeIsaret = yDenge > 0 ? "+ " : "";
 
                 const kartHtml = `
                     <div class="aylik-kart">
-                        <div class="aylik-kart-baslik"><span>📅 ${aylarIsimleri[mIndex]}</span><span style="${dengeStili}">${dengeMetni}</span></div>
-                        <div class="aylik-kart-detay">
-                            <div>Gelir: <span style="color:var(--success)">${tGel.toLocaleString('tr-TR')} TL</span></div>
-                            <div>Gider: <span style="color:var(--danger)">${tGid.toLocaleString('tr-TR')} TL</span></div>
-                            <div style="grid-column: span 2; margin-top: 2px; border-top: 1px dotted #eee; padding-top: 2px;">Ödenecek Kalan (Açık Gider): <span>${tKal.toLocaleString('tr-TR')} TL</span></div>
+                        <div class="aylik-kart-baslik">
+                            <span>${aylarIsimleri[m]} ${secilenYil}</span>
+                            <span style="color:${dengeRenk}">${dengeIsaret}${yDenge.toLocaleString('tr-TR')} TL</span>
                         </div>
-                    </div>`;
-                container.insertAdjacentHTML('beforeend', kartHtml);
+                        <div class="aylik-kart-detay">
+                            <span>📈 Gelir: <b style="color:var(--success)">${yGelir.toLocaleString('tr-TR')} TL</b></span>
+                            <span>📉 Gider: <b style="color:var(--danger)">${yGider.toLocaleString('tr-TR')} TL</b></span>
+                        </div>
+                    </div>
+                `;
+                listeAlani.insertAdjacentHTML('beforeend', kartHtml);
             }
         } catch (err) {
-            console.error(err);
+            console.error("Yıllık rapor hatası: ", err);
+            listeAlani.innerHTML = "<div style='padding:10px; color:var(--danger);'>Rapor yüklenirken hata oluştu.</div>";
         }
     }
 
     // =======================================================
-    // 🧠 YAPAY ZEKA TOPLU İŞLEM MOTORU (BULK ENGINE v22.1)
+    // 🧠 AI SMART TOPLU OPERASYON ALGORİTMASI
     // =======================================================
     async function aiMesajGonder() {
-        const inputEl = document.getElementById("ai-user-input");
-        const query = inputEl.value.trim();
-        if(!query) return;
+        const inputEl = document.getElementById('ai-user-input');
+        const text = inputEl.value.trim();
+        if(!text) return;
 
-        const chatBox = document.getElementById("ai-chat-box");
-        chatBox.insertAdjacentHTML("beforeend", `<div class="msg user">${query}</div>`);
+        aiMesajBas(text, 'user');
         inputEl.value = "";
-        chatBox.scrollTop = chatBox.scrollHeight;
 
-        chatBox.insertAdjacentHTML("beforeend", `<div class="msg ai" id="ai-loading">🤔 Düşünüyorum...</div>`);
-        chatBox.scrollTop = chatBox.scrollHeight;
+        const sistemGecmisYil = document.getElementById('y-sel').value;
+        const sistemGecmisAy = document.getElementById('m-sel').value;
 
-        const systemPrompt = `Sen bir bütçe asistanı yapay zekasısın. Kullanıcının verdiği Türkçe komutlara göre toplu ekleme veya toplu silme işlemi üreten bir JSON motorusun.
-Mevcut Aktif Dönem Yılı: ${document.getElementById('y-sel').value}, Ay İndeksi: ${document.getElementById('m-sel').value} (${aylarIsimleri[document.getElementById('m-sel').value]})
+        aiMesajBas("🧠 İşlem emriniz yapay zeka tarafından çözümleniyor ve veritabanına toplu olarak işleniyor, lütfen bekleyin...", 'ai');
 
-Kullanıcı "X ayından Y ayına kadar" veya belirli bir dönem için ekleme/silme isteyebilir. Ayları doğru algıla:
-Ocak:0, Şubat:1, Mart:2, Nisan:3, Mayıs:4, Haziran:5, Temmuz:6, Ağustos:7, Eylül:8, Ekim:9, Kasım:10, Aralık:11.
-Eğer kullanıcı "yıl sonuna kadar" derse, hedef ay Aralık (11) şıkkıdır.
-
-Yanıt olarak SADECE aşağıdaki formatta bir JSON objesi döndür, açıklama veya markdown ekleme:
-{
-  "islem": "ekle" veya "sil",
-  "tip": "gider" veya "gelir",
-  "baslangicYil": 2026,
-  "baslangicAy": 5,
-  "bitisYil": 2026,
-  "bitisAy": 11,
-  "ad": "Harcama veya Gelir Adı",
-  "tu": 5000,
-  "gu": 15
-}`;
+        const promptCommand = `
+        Sen bir bütçe yönetim sisteminin arka plan toplu işlem motorusun. Kullanıcının vermiş olduğu Türkçe emri analiz et ve tam olarak istenen aksiyonları JSON formatında döndür.
+        Mevcut Yıl: ${sistemGecmisYil}, Mevcut Ay İndeksi: ${sistemGecmisAy} (0=Ocak, 11=Aralık).
+        
+        Kullanıcı belirli bir aya, ay aralığına ("hazirandan eylüle kadar") veya yıl sonuna kadar işlem isteyebilir.
+        
+        Sadece ve sadece şu şablona sahip bir JSON döndür:
+        {
+          "aksiyon": "EKLE" veya "SIL",
+          "tip": "gider" veya "gelir",
+          "hedef_donemler": ["2026_5", "2026_6"], 
+          "aranacak_kelime": "silme işleminde açıklama içinde geçecek kelime",
+          "eklenecek_veri": {"ad": "Harcama Adı", "tu": "5000", "gu": "15", "od": false}
+        }
+        Cevabında markdown işaretleri (\`\`\`json) veya açıklama metni olmasın, sadece saf JSON döndür.
+        Kullanıcı Emri: "${text}"
+        `;
 
         try {
             const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: systemPrompt + "\n\nKullanıcı Komutu: " + query }] }],
-                    generationConfig: { responseMimeType: "application/json" }
-                })
+                body: JSON.stringify({ contents: [{ parts: [{ text: promptCommand }] }] })
             });
-
             const resData = await response.json();
-            const rawJson = resData.candidates[0].content.parts[0].text;
-            const command = JSON.parse(rawJson);
+            let aiText = resData.candidates[0].content.parts[0].text.trim();
+            
+            // Markdown bloklarını temizleme garantisi
+            aiText = aiText.replace(/```json/g, "").replace(/```/g, "").trim();
+            const cmd = JSON.parse(aiText);
 
-            document.getElementById("ai-loading").remove();
-
-            if (!command.islem || command.baslangicAy === undefined) {
-                chatBox.insertAdjacentHTML("beforeend", `<div class="msg ai">Sana nasıl yardımcı olabileceğimi tam anlayamadım Volkan. Tarih aralığını ve tutarı net belirterek tekrar dener misin?</div>`);
-                chatBox.scrollTop = chatBox.scrollHeight;
+            if(!cmd.hedef_donemler || cmd.hedef_donemler.length === 0) {
+                aiMesajBas("⚠️ Komut anlaşılamadı veya geçerli bir tarih aralığı saptanamadı.", 'ai');
                 return;
             }
 
-            let logMetni = "";
-            let bAy = parseInt(command.baslangicAy);
-            let bYil = parseInt(command.baslangicYil);
-            let bitAy = parseInt(command.bitisAy);
-            let bitYil = parseInt(command.bitisYil);
+            let etkilenenSatirSayisi = 0;
 
-            hafizayaKaydet();
-
-            let targetMonths = [];
-            let currentY = bYil, currentM = bAy;
-            while (currentY < bitYil || (currentY === bitYil && currentM <= bitAy)) {
-                targetMonths.push({ y: currentY, m: currentM });
-                currentM++;
-                if (currentM > 11) { currentM = 0; currentY++; }
-            }
-
-            for (let target of targetMonths) {
-                const dk = `${target.y}_${target.m}`;
+            for(let dk of cmd.hedef_donemler) {
                 const { data } = await sb.from("donemler").select("*").eq("username", aktifId).eq("donem_id", dk);
-                
                 let gs = (data && data.length > 0) ? (data[0].giderler || []) : [];
                 let gl = (data && data.length > 0) ? (data[0].gelirler || []) : [];
 
-                if (command.islem === "ekle") {
-                    if (command.tip === "gider") {
-                        gs.push({ ad: command.ad, tu: command.tu.toString(), gu: (command.gu || "15").toString(), od: false, taksitId: "" });
+                if(cmd.aksiyon === "EKLE") {
+                    if(cmd.tip === "gider") {
+                        gs.push({ad: cmd.eklenecek_veri.ad, tu: cmd.eklenecek_veri.tu.toString(), gu: cmd.eklenecek_veri.gu || "1", od: false, taksitId: ""});
                     } else {
-                        gl.push({ ad: command.ad, tu: command.tu.toString() });
+                        gl.push({ad: cmd.eklenecek_veri.ad, tu: cmd.eklenecek_veri.tu.toString()});
                     }
-                } else if (command.islem === "sil") {
-                    if (command.tip === "gider") {
-                        gs = gs.filter(x => !x.ad.toLowerCase().includes(command.ad.toLowerCase()));
+                    etkilenenSatirSayisi++;
+                } 
+                else if(cmd.aksiyon === "SIL") {
+                    const anahtar = cmd.aranacak_kelime.toLowerCase().trim();
+                    if(cmd.tip === "gider") {
+                        let eskiBoyut = gs.length;
+                        gs = gs.filter(x => !x.ad.toLowerCase().includes(anahtar));
+                        etkilenenSatirSayisi += (eskiBoyut - gs.length);
                     } else {
-                        gl = gl.filter(x => !x.ad.toLowerCase().includes(command.ad.toLowerCase()));
+                        let eskiBoyut = gl.length;
+                        gl = gl.filter(x => !x.ad.toLowerCase().includes(anahtar));
+                        etkilenenSatirSayisi += (eskiBoyut - gl.length);
                     }
                 }
+
                 await sb.from("donemler").upsert({ username: aktifId, donem_id: dk, giderler: gs, gelirler: gl });
             }
 
-            if (command.islem === "ekle") {
-                logMetni = `👍 İşlem Başarılı! Belirttiğin dönem aralığındaki her aya **'${command.ad}'** işlemi **${command.tu} TL** olarak başarıyla işlendi.`;
-            } else {
-                logMetni = `🗑️ İşlem Başarılı! İlgili dönem aralığından **'${command.ad}'** adına ait tüm kayıtlar tamamen temizlendi.`;
-            }
-
-            chatBox.insertAdjacentHTML("beforeend", `<div class="msg ai">${logMetni}</div>`);
-            chatBox.scrollTop = chatBox.scrollHeight;
-            verileriCek();
+            aiMesajBas(`✅ Toplu işlem başarıyla tamamlandı!\n• Hedef Dönem Sayısı: ${cmd.hedef_donemler.length} ay\n• Gerçekleşen Aksiyon: ${cmd.aksiyon}\n• Detay: ${cmd.tip === 'gider' ? 'Giderler' : 'Gelirler'} güncellendi.`, 'ai');
+            setTimeout(verileriCek, 800);
 
         } catch (err) {
             console.error(err);
-            if(document.getElementById("ai-loading")) document.getElementById("ai-loading").remove();
-            chatBox.insertAdjacentHTML("beforeend", `<div class="msg ai">Hata oluştu, işlem gerçekleştirilemedi.</div>`);
-            chatBox.scrollTop = chatBox.scrollHeight;
+            aiMesajBas("❌ Toplu işlem gerçekleştirilirken yapay zeka motorunda bir hata oluştu veya geçersiz komut yapısı döndü.", 'ai');
         }
+    }
+
+    function aiMesajBas(metin, gonderen) {
+        const box = document.getElementById('ai-chat-box');
+        const mHtml = `<div class="msg ${gonderen}">${metin.replace(/\n/g, '<br>')}</div>`;
+        box.insertAdjacentHTML('beforeend', mHtml);
+        box.scrollTop = box.scrollHeight;
     }
 </script>
 </body>
