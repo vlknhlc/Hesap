@@ -141,8 +141,7 @@
                             <th>İşlem</th>
                         </tr>
                     </thead>
-                    <tbody id="islemListesi">
-                        </tbody>
+                    <tbody id="islemListesi"></tbody>
                 </table>
             </div>
         </div>
@@ -150,13 +149,11 @@
 </div>
 
 <script>
-    // URL kesinlikle doğru
     const SUPABASE_URL = "https://itmjtoevsxvpzphnxauc.supabase.co"; 
     
-    // BURAYA EKANDAKİ YENİ "sb_publishable_..." ANAHTARINI YAPIŞTIR
+    // ⚠️ KOPYALADIĞIN GERÇEK ANAHTARI BU İKİ TIRNAK ARASINA YAPIŞTIR:
     const SUPABASE_ANON_KEY = "sb_publishable_L7HzzWwk6-VMZN3aNDNSWQ_LToJsfjn"; 
     
-    // Güvenli istemci tanımı
     const butceClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     window.onload = function() {
@@ -178,7 +175,6 @@
         }
 
         try {
-            // Sütun isimleri resimdeki gibi 'username' ve 'password' olarak ayarlandı
             const { data, error } = await butceClient
                 .from('sistem_kullanicilari')
                 .select('*')
