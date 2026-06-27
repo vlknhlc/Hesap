@@ -1,12 +1,163 @@
-<script>
-    // Supabase Bağlantı Parametreleri
-    const SUPABASE_URL = "https://itmjtoevsxvpzphnxauc.supabase.co"; 
-    const SUPABASE_ANON_KEY = "EyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml0bWp0b2V2c3h2cHpwaG54YXVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0OTA1NDYsImV4cCI6MjA5ODA2NjU0Nn0.MBvdsBKeQgoNZbAf5hFaJ957EN_nb-Zj3D17ySSdLkw"; 
-    
-    // Uygulama genelinde SADECE TEK BİR supabase istemcisi tanımlanıyor
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bütçe Takip Sistemi</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --primary: #10b981;
+            --danger: #ef4444;
+            --bg: #1f2937;
+            --card: #111827;
+            --text: #f3f4f6;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            width: 100%;
+            max-width: 800px;
+        }
+        .card {
+            background: var(--card);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            margin-bottom: 20px;
+        }
+        .hidden { display: none !important; }
+        input, select, button {
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 6px;
+            border: 1px solid #374151;
+            background: #1f2937;
+            color: white;
+            box-sizing: border-box;
+        }
+        input:focus, select:focus { outline: 1px solid var(--primary); }
+        button {
+            background: var(--primary);
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+        }
+        button:hover { opacity: 0.9; }
+        .logout-btn { background: var(--danger); margin-top: 10px; }
+        .ozet-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .ozet-kutu {
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .gelir-kutu { background: #065f46; }
+        .gider-kutu { background: #991b1b; }
+        .kalan-kutu { background: #1e3a8a; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #374151;
+        }
+        th { background: #111827; }
+        .row-gelir { color: #34d399; }
+        .row-gider { color: #f87171; }
+        .sil-btn {
+            background: var(--danger);
+            padding: 5px 10px;
+            width: auto;
+            margin: 0;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
 
-    // Sayfa Yüklendiğinde Oturum Kontrolü
+<div class="container">
+    <div id="loginSection" class="card">
+        <h2>ButceTakip Giriş</h2>
+        <input type="text" id="loginUsername" placeholder="Kullanıcı Adı" required>
+        <input type="password" id="loginPassword" placeholder="Şifre" required>
+        <button onclick="kullaniciGiris()">Giriş Yap</button>
+    </div>
+
+    <div id="appSection" class="hidden">
+        <div class="card" style="display: flex; justify-content: space-between; align-items: center;">
+            <h2>Hoş geldin, <span id="userDisplay"></span>!</h2>
+            <button onclick="cikisYap()" class="logout-btn" style="width: auto;">Çıkış Yap</button>
+        </div>
+
+        <div class="ozet-grid">
+            <div class="ozet-kutu gelir-kutu">Toplam Gelir: <span id="toplamGelir">0</span> TL</div>
+            <div class="ozet-kutu gider-kutu">Toplam Gider: <span id="toplamGider">0</span> TL</div>
+            <div class="ozet-kutu kalan-kutu">Net Kalan: <span id="netKalan">0</span> TL</div>
+        </div>
+
+        <div class="card">
+            <h3>Yeni İşlem Ekle</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <input type="month" id="ayYil" required>
+                <select id="veriTipi">
+                    <option value="gelir">Gelir</option>
+                    <option value="gider">Gider</option>
+                </select>
+            </div>
+            <input type="text" id="kategori" placeholder="Kategori (Örn: Maaş, Mutfak, Kira)">
+            <input type="number" id="miktar" placeholder="Miktar (TL)" required>
+            <input type="text" id="aciklama" placeholder="Açıklama (Opsiyonel)">
+            <button onclick="yeniVeriEkle()">Kaydet</button>
+        </div>
+
+        <div class="card">
+            <h3>İşlem Geçmişi</h3>
+            <div style="overflow-x: auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Dönem</th>
+                            <th>Kategori</th>
+                            <th>Açıklama</th>
+                            <th>Miktar</th>
+                            <th>İşlem</th>
+                        </tr>
+                    </thead>
+                    <tbody id="islemListesi">
+                        </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Çakışmayı önlemek için değişken ismini tamamen benzersiz yaptık
+    const BUTCETAKIP_URL = "https://itmjtoevsxvpzphnxauc.supabase.co"; 
+    const BUTCETAKIP_KEY = "EyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml0bWp0b2V2c3h2cHpwaG54YXVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0OTA1NDYsImV4cCI6MjA5ODA2NjU0Nn0.MBvdsBKeQgoNZbAf5hFaJ957EN_nb-Zj3D17ySSdLkw"; 
+    
+    // Global window.supabase nesnesini kullanarak başlattık
+    const butceSupabaseClient = window.supabase.createClient(BUTCETAKIP_URL, BUTCETAKIP_KEY);
+
+    // Oturum Kontrolü
     window.onload = function() {
         const kayitliKullanici = localStorage.getItem("aktif_kullanici");
         if (kayitliKullanici) {
@@ -16,7 +167,7 @@
         document.getElementById('ayYil').value = bugun.toISOString().slice(0, 7);
     };
 
-    // Kullanıcı Giriş Fonksiyonu
+    // Giriş Fonksiyonu
     async function kullaniciGiris() {
         const uName = document.getElementById("loginUsername").value.trim();
         const uPass = document.getElementById("loginPassword").value.trim();
@@ -27,7 +178,7 @@
         }
 
         try {
-            const { data, error } = await supabase
+            const { data, error } = await butceSupabaseClient
                 .from('sistem_kullanicilari')
                 .select('*')
                 .eq('username', uName);
@@ -70,10 +221,10 @@
         document.getElementById("loginSection").classList.remove("hidden");
     }
 
-    // Verileri Listeleme ve Hesaplama Fonksiyonu
+    // Verileri Yükle
     async function verileriYukle(username) {
         try {
-            const { data, error } = await supabase
+            const { data, error } = await butceSupabaseClient
                 .from('kullanici_verileri')
                 .select('*')
                 .eq('username', username)
@@ -113,7 +264,7 @@
         }
     }
 
-    // Yeni Veri Ekleme
+    // Veri Ekle
     async function yeniVeriEkle() {
         const uName = localStorage.getItem("aktif_kullanici");
         const ayYil = document.getElementById("ayYil").value;
@@ -128,7 +279,7 @@
         }
 
         try {
-            const { error } = await supabase
+            const { error } = await butceSupabaseClient
                 .from('kullanici_verileri')
                 .insert([
                     {
@@ -154,13 +305,13 @@
         }
     }
 
-    // Veri Silme Fonksiyonu
+    // Veri Sil
     async function veriSil(id) {
         if (!confirm("Bu işlemi silmek istediğinize emin misiniz?")) return;
         const uName = localStorage.getItem("aktif_kullanici");
 
         try {
-            const { error } = await supabase
+            const { error } = await butceSupabaseClient
                 .from('kullanici_verileri')
                 .delete()
                 .eq('id', id);
@@ -172,3 +323,6 @@
         }
     }
 </script>
+
+</body>
+</html>
