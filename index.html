@@ -2,199 +2,222 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bütçe Takip Sistemi</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Bütçe Takip Pro v22.1 + Akıllı AI</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root { --primary: #10b981; --danger: #ef4444; --bg: #1f2937; --card: #111827; --text: #f3f4f6; }
-        body { font-family: 'Segoe UI', sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 20px; display: flex; justify-content: center; }
-        .container { width: 100%; max-width: 800px; }
-        .card { background: var(--card); padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); margin-bottom: 20px; }
-        .hidden { display: none !important; }
-        input, select, button { width: 100%; padding: 12px; margin: 8px 0; border-radius: 6px; border: 1px solid #374151; background: #1f2937; color: white; box-sizing: border-box; }
-        button { background: var(--primary); font-weight: bold; cursor: pointer; border: none; }
-        button:hover { opacity: 0.9; }
-        .logout-btn { background: var(--danger); margin-top: 10px; }
-        .ozet-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
-        .ozet-kutu { padding: 15px; border-radius: 8px; text-align: center; font-weight: bold; }
-        .gelir-kutu { background: #065f46; } .gider-kutu { background: #991b1b; } .kalan-kutu { background: #1e3a8a; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #374151; }
-        th { background: #111827; }
-        .row-gelir { color: #34d399; } .row-gider { color: #f87171; }
-        .sil-btn { background: var(--danger); padding: 5px 10px; width: auto; margin: 0; font-size: 12px; }
+        :root { 
+            --primary: #2c3e50; --accent: #3498db; --danger: #e74c3c; --success: #27ae60; --warning: #f39c12;
+            --bg: #f4f7f6; --row-bg: #ffffff; --border: #dfe6e9;
+            --row-success: #e8f5e9; --row-danger: #ffebee; --row-warning: #fffde7;
+            --ai-bg: #8e44ad;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
+        body { background: var(--bg); padding: 5px; }
+
+        /* Giriş Ekranı */
+        #login-screen { position: fixed; inset: 0; background: var(--primary); display: flex; align-items: center; justify-content: center; z-index: 9999; }
+        .login-box { background: white; padding: 30px; border-radius: 12px; width: 90%; max-width: 320px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+        .login-box h2 { margin-bottom: 15px; color: var(--primary); }
+        .login-box input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; outline: none; }
+        .btn-log { width: 100%; padding: 12px; background: var(--accent); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; font-size: 15px; }
+        .link-group { margin-top: 15px; display: flex; flex-direction: column; gap: 8px; }
+        .auth-link { color: var(--accent); cursor: pointer; text-decoration: underline; font-size: 13px; }
+        .forgot-link { color: #95a5a6; cursor: pointer; text-decoration: none; font-size: 12px; }
+
+        /* Uygulama Ana Yapısı */
+        #app-content { display: none; max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .nav { background: var(--primary); color: white; padding: 12px; display: flex; justify-content: space-between; align-items: center; }
+        .nav select { padding: 5px; border-radius: 4px; border: none; font-weight: bold; }
+
+        /* Progress Bar Alanı */
+        .progress-container { padding: 15px; background: #fff; border-bottom: 1px solid var(--border); }
+        .progress-label { display: flex; justify-content: space-between; font-size: 12px; font-weight: bold; margin-bottom: 5px; }
+        .progress-bg { width: 100%; height: 12px; background: #eee; border-radius: 10px; overflow: hidden; }
+        #progress-bar { height: 100%; width: 0%; background: var(--success); transition: 0.5s; }
+
+        /* Tablo Görünümü */
+        .section-header { background: #f8f9fa; padding: 10px; font-weight: bold; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .row { display: grid; border-bottom: 1px solid var(--border); align-items: center; min-height: 48px; background: var(--row-bg); transition: background-color 0.3s; }
+        .g-row { grid-template-columns: 1fr 80px 50px 35px 30px 30px; }
+        .gel-row { grid-template-columns: 1fr 100px 35px; }
+        .head-cell { font-size: 10px; color: #7f8c8d; text-align: center; font-weight: bold; text-transform: uppercase; }
+        .cell { padding: 4px; border-right: 1px solid #f1f1f1; display: flex; align-items: center; height: 100%; justify-content: center; }
+        .cell:first-child { justify-content: flex-start; }
+        .table-input { width: 100%; border: none !important; padding: 8px 4px; background: transparent; font-size: 13px; outline: none; }
+        .in-tu { font-weight: bold; text-align: right; color: var(--primary); }
+        .in-gu { font-weight: 800; text-align: center; color: var(--accent); font-size: 14px; background: rgba(240, 247, 255, 0.5) !important; }
+        input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--success); cursor: pointer; }
+        .del-btn { background: none; border: none; color: #ccc; font-size: 18px; cursor: pointer; width: 100%; }
+        .taksit-btn { background: none; border: none; color: var(--accent); font-size: 14px; cursor: pointer; width: 100%; filter: grayscale(0.2); }
+        .taksit-btn:hover { filter: grayscale(0); transform: scale(1.1); }
+        
+        /* Özet Alanları */
+        .summary { padding: 15px; background: #fdfdfd; border-bottom: 4px solid var(--border); }
+        .sum-line { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #eee; font-size: 14px; }
+        .sum-line.total { font-size: 15px; font-weight: bold; color: var(--danger); }
+        .sum-line.denge { border-top: 2px dashed var(--border); border-bottom: none; font-size: 17px; font-weight: 800; padding-top: 10px; margin-top: 5px; }
+        
+        /* Yıllık Rapor Küpleri */
+        .yillik-container { padding: 15px; background: #fcfcfc; border-bottom: 4px solid var(--border); }
+        .yillik-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 2px solid var(--primary); padding-bottom: 8px; color: var(--primary); font-weight: bold; }
+        .yillik-header select { padding: 4px 8px; font-weight: bold; border-radius: 4px; border: 1px solid var(--primary); }
+        .aylik-kart { background: white; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; padding: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+        .aylik-kart-baslik { font-size: 15px; font-weight: bold; color: var(--primary); border-bottom: 1px dashed #eee; padding-bottom: 4px; margin-bottom: 6px; display: flex; justify-content: space-between; }
+        .aylik-kart-detay { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 12px; color: #555; }
+        
+        /* YAPAY ZEKA SMART CHAT ALANI */
+        .ai-container { padding: 15px; background: #f5f0f8; }
+        .ai-header { color: var(--ai-bg); font-weight: 800; border-bottom: 2px solid var(--ai-bg); padding-bottom: 8px; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+        .ai-box { background: white; border: 1px solid #dcd1e4; border-radius: 12px; height: 250px; overflow-y: auto; padding: 10px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 8px; }
+        .msg { max-width: 85%; padding: 10px; border-radius: 10px; font-size: 13px; line-height: 1.4; }
+        .msg.user { background: var(--accent); color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
+        .msg.ai { background: #f0e6f4; color: #333; align-self: flex-start; border-bottom-left-radius: 2px; border: 1px solid #e1d3eb; }
+        .ai-input-group { display: flex; gap: 6px; }
+        .ai-input-group input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px; outline: none; }
+        .ai-input-group button { background: var(--ai-bg); color: white; border: none; padding: 0 15px; border-radius: 8px; font-weight: bold; cursor: pointer; }
+
+        .btn-add { width: 100%; padding: 12px; border: none; background: #fff; color: var(--accent); font-weight: bold; cursor: pointer; }
+        .btn-copy { font-size: 10px; background: var(--accent); color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
+        .btn-clear-all { font-size: 14px; background: none; border: none; color: var(--danger); cursor: pointer; font-weight: bold; padding: 0 5px; }
+        .btn-undo { font-size: 10px; background: #7f8c8d; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; margin-right: 5px; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <div id="loginSection" class="card">
-        <h2>ButceTakip Giriş</h2>
-        <input type="text" id="loginUsername" placeholder="Kullanıcı Adı" required>
-        <input type="password" id="loginPassword" placeholder="Şifre" required>
-        <button onclick="kullaniciGiris()">Giriş Yap</button>
+<div id="login-screen">
+    <div class="login-box">
+        <h2 id="log-title">Bütçe Giriş</h2>
+        <input type="email" id="log-email" placeholder="E-posta" onkeydown="if(event.key==='Enter') authHareketi()">
+        <input type="password" id="log-pass" placeholder="Şifre" onkeydown="if(event.key==='Enter') authHareketi()">
+        <button class="btn-log" onclick="authHareketi()" id="log-main-btn">GİRİŞ YAP</button>
+        <div class="link-group">
+            <span class="auth-link" onclick="modDegis()" id="log-toggle-link">Yeni Hesap Oluştur</span>
+            <span class="forgot-link" onclick="sifreHatirlat()">Şifremi Unuttum?</span>
+        </div>
+    </div>
+</div>
+
+<div id="app-content">
+    <div class="nav">
+        <span id="user-display" style="font-size:10px;">...</span>
+        <div>
+            <button class="btn-undo" onclick="geriAl()" title="Son işlemi geri al">↩ Geri Al</button>
+            <select id="y-sel" onchange="verileriCek()"></select>
+            <select id="m-sel" onchange="verileriCek()"></select>
+        </div>
+        <button onclick="location.reload()" style="background:var(--danger); color:white; border:none; padding:4px 8px; border-radius:4px; font-size:10px;">ÇIKIŞ</button>
     </div>
 
-    <div id="appSection" class="hidden">
-        <div class="card" style="display: flex; justify-content: space-between; align-items: center;">
-            <h2>Hoş geldin, <span id="userDisplay"></span>!</h2>
-            <button onclick="cikisYap()" class="logout-btn" style="width: auto;">Çıkış Yap</button>
+    <div class="progress-container">
+        <div class="progress-label">
+            <span>Bütçe Kullanımı</span>
+            <span id="progress-percent">%0</span>
         </div>
-
-        <div class="ozet-grid">
-            <div class="ozet-kutu gelir-kutu">Toplam Gelir: <span id="toplamGelir">0</span> TL</div>
-            <div class="ozet-kutu gider-kutu">Toplam Gider: <span id="toplamGider">0</span> TL</div>
-            <div class="ozet-kutu kalan-kutu">Net Kalan: <span id="netKalan">0</span> TL</div>
+        <div class="progress-bg">
+            <div id="progress-bar"></div>
         </div>
+    </div>
 
-        <div class="card">
-            <h3>Yeni İşlem Ekle</h3>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                <input type="month" id="ayYil" required>
-                <select id="veriTipi">
-                    <option value="gelir">Gelir</option>
-                    <option value="gider">Gider</option>
-                </select>
-            </div>
-            <input type="text" id="kategori" placeholder="Kategori (Örn: Maaş, Mutfak, Kira)">
-            <input type="number" id="miktar" placeholder="Miktar (TL)" required>
-            <input type="text" id="aciklama" placeholder="Açıklama (Opsiyonel)">
-            <button onclick="yeniVeriEkle()">Kaydet</button>
+    <div class="section-header" style="color:var(--danger)">
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <span>📉 GİDERLER</span>
+            <button class="btn-clear-all" onclick="tumGiderleriSil()" title="Bu ayın tüm giderlerini sil">🗑️</button>
         </div>
+        <button class="btn-copy" onclick="gecenAyiKopyala()">Geçen Ayı Kopyala</button>
+    </div>
+    <div class="row g-row head-cell" style="background:#f9f9f9; min-height:25px;">
+        <div style="justify-content: flex-start; padding-left: 5px;">AÇIKLAMA</div><div>TUTAR</div><div>GÜN</div><div>OK</div><div>🗓️</div><div>❌</div>
+    </div>
+    <div id="g-list"></div>
+    <button class="btn-add" onclick="satirEkle('gider')">+ Yeni Gider Satırı</button>
 
-        <div class="card">
-            <h3>İşlem Geçmişi</h3>
-            <div style="overflow-x: auto;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Dönem</th>
-                            <th>Kategori</th>
-                            <th>Açıklama</th>
-                            <th>Miktar</th>
-                            <th>İşlem</th>
-                        </tr>
-                    </thead>
-                    <tbody id="islemListesi"></tbody>
-                </table>
-            </div>
+    <div class="section-header" style="color:var(--success); margin-top:10px;">📈 GELİRLER</div>
+    <div id="gel-list"></div>
+    <button class="btn-add" onclick="satirEkle('gelir')">+ Yeni Gelir Satırı</button>
+
+    <div class="summary">
+        <div class="sum-line"><span>Toplam Gelir:</span> <span id="res-tgel" style="color:var(--success); font-weight:bold;">0 TL</span></div>
+        <div class="sum-line"><span>Toplam Gider:</span> <span id="res-tg" style="color:var(--danger); font-weight:bold;">0 TL</span></div>
+        <div class="sum-line total"><span>ÖDENECEK KALAN (Açık Giderler):</span> <span id="res-kalan">0 TL</span></div>
+        <div class="sum-line denge"><span>AYLIK NET DENGE:</span> <span id="res-denge">0 TL</span></div>
+    </div>
+
+    <div class="yillik-container">
+        <div class="yillik-header">
+            <span>📅 YILLIK FİNANSAL RAPOR</span>
+            <select id="yillik-y-sel" onchange="yillikRaporHesapla()"></select>
+        </div>
+        <div id="yillik-rapor-listesi"></div>
+    </div>
+
+    <div class="ai-container">
+        <div class="ai-header">🧠 AI AKILLI FİNANS ASİSTANI v22.1</div>
+        <div class="ai-box" id="ai-chat-box">
+            <div class="msg ai">Selam Volkan! Sistemi tamamen senin verdiğin yeni direktife göre güncelledim. Artık tek bir aya değil, belirttiğin **tüm geniş tarih aralıklarına** toplu ekleme ve silme operasyonları yapabiliyorum! <br><br><b>Örnek Komutlar:</b><br>• <i>"2026 eylül ayından yıl sonuna kadar olan vakıf giderini sistemden temizle."</i><br>• <i>"Hazirandan yıl sonuna kadar her aya 'Prim' adında 50.000 TL gelir ekle."</i></div>
+        </div>
+        <div class="ai-input-group">
+            <input type="text" id="ai-user-input" placeholder="Toplu işlem emri verin..." onkeydown="if(event.key==='Enter') aiMesajGonder()">
+            <button onclick="aiMesajGonder()">GÖNDER</button>
         </div>
     </div>
 </div>
 
 <script>
+    // =======================================================
+    // 🗄️ SUPABASE BAĞLANTI AYARLARI
+    // =======================================================
     const SUPABASE_URL = "https://itmjtoevsxvpzphnxauc.supabase.co"; 
+    const SUPABASE_ANON_KEY = "BURAYA_KENDI_SB_PUBLISHABLE_ANAHTARINI_YAPISTIR"; // Panelden kopyaladığın tam anahtarı buraya koy!
     
-    // Kendi panelinden kopyaladığın sb_publishable_ ile başlayan anahtarı buraya yaz:
-    const SUPABASE_ANON_KEY = "sb_publishable_L7HzzWwk6-VMZN3aNDNSWQ_LToJsfjn"; 
-    
-    const butceClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    window.onload = function() {
-        const kayitliKullanici = localStorage.getItem("aktif_kullanici");
-        if (kayitliKullanici) { paneliGoster(kayitliKullanici); }
-        const bugun = new Date();
-        document.getElementById('ayYil').value = bugun.toISOString().slice(0, 7);
-    };
+    const GEMINI_API_KEY = "AIzaSyAbD6sO0u5zmWSO_ICEbLz3kJNpOWtYiLw"; 
 
-    async function kullaniciGiris() {
-        const uName = document.getElementById("loginUsername").value.trim();
-        const uPass = document.getElementById("loginPassword").value.trim();
-        if (!uName || !uPass) { alert("Lütfen alanları doldurun!"); return; }
+    let isLogMode = true;
+    let aktifId = "";
+    let geçmişHafıza = [];
+    const aylarIsimleri = ["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
+    let globalYillikDataCaches = {};
 
-        try {
-            const { data, error } = await butceClient
-                .from('sistem_kullanicilari')
-                .select('*')
-                .eq('username', uName);
+    function modDegis() {
+        isLogMode = !isLogMode;
+        document.getElementById('log-title').innerText = isLogMode ? "Bütçe Giriş" : "Yeni Kayıt";
+        document.getElementById('log-main-btn').innerText = isLogMode ? "GİRİŞ YAP" : "KAYIT OL";
+        document.getElementById('log-toggle-link').innerText = isLogMode ? "Yeni Hesap Oluştur" : "Zaten Hesabım Var";
+    }
 
-            if (error) { alert("Veritabanı Hatası: " + error.message); return; }
-            if (!data || data.length === 0) { alert("Kullanıcı adı bulunamadı!"); return; }
+    // =======================================================
+    // 🔐 KIMLIK DOĞRULAMA SİSTEMİ (SUPABASE DB SÜRÜMÜ)
+    // =======================================================
+    async function authHareketi() {
+        const email = document.getElementById('log-email').value.trim().toLowerCase();
+        const pass = document.getElementById('log-pass').value;
+        if(!email || !pass) { alert("Boş bırakmayın!"); return; }
+        const uId = email.replace(/\./g, "_");
 
-            const kullanici = data[0];
-            if (kullanici.password === uPass) {
-                localStorage.setItem("aktif_kullanici", kullanici.username);
-                paneliGoster(kullanici.username);
-            } else {
-                alert("Hatalı şifre!");
+        if(isLogMode) {
+            try {
+                const { data, error } = await sb.from("sistem_kullanicilari").select("*").eq("username", uId);
+                if (error) throw error;
+
+                if(data && data.length > 0 && data[0].password == pass) {
+                    aktifId = uId;
+                    document.getElementById('user-display').innerText = email;
+                    document.getElementById('login-screen').style.display = 'none';
+                    document.getElementById('app-content').style.display = 'block';
+                    verileriCek(true);
+                } else {
+                    alert("Hatalı giriş!");
+                }
+            } catch (err) {
+                console.error(err);
+                alert("Giriş sırasında hata oluştu: " + err.message);
             }
-        } catch (err) { console.error(err); alert("Sistem hatası."); }
-    }
-
-    function paneliGoster(username) {
-        document.getElementById("loginSection").classList.add("hidden");
-        document.getElementById("appSection").classList.remove("hidden");
-        document.getElementById("userDisplay").innerText = username;
-        verileriYukle(username);
-    }
-
-    function cikisYap() {
-        localStorage.removeItem("aktif_kullanici");
-        document.getElementById("appSection").classList.add("hidden");
-        document.getElementById("loginSection").classList.remove("hidden");
-    }
-
-    async function verileriYukle(username) {
-        try {
-            const { data, error } = await butceClient
-                .from('kullanici_verileri')
-                .select('*')
-                .eq('username', username)
-                .order('created_at', { ascending: false });
-
-            if (error) throw error;
-            const tBody = document.getElementById("islemListesi");
-            tBody.innerHTML = "";
-            let tGelir = 0; let tGider = 0;
-
-            data.forEach(item => {
-                const miktarNum = parseFloat(item.miktar);
-                if (item.veri_tipi === 'gelir') tGelir += miktarNum; else tGider += miktarNum;
-                const tr = document.createElement("tr");
-                tr.className = item.veri_tipi === 'gelir' ? 'row-gelir' : 'row-gider';
-                tr.innerHTML = `
-                    <td>${item.ay_yil}</td>
-                    <td>${item.kategori || '-'}</td>
-                    <td>${item.aciklama || '-'}</td>
-                    <td>${item.veri_tipi === 'gelir' ? '+' : '-'}${miktarNum} TL</td>
-                    <td><button class="sil-btn" onclick="veriSil(${item.id})">Sil</button></td>
-                `;
-                tBody.appendChild(tr);
-            });
-            document.getElementById("toplamGelir").innerText = tGelir.toFixed(2);
-            document.getElementById("toplamGider").innerText = tGider.toFixed(2);
-            document.getElementById("netKalan").innerText = (tGelir - tGider).toFixed(2);
-        } catch (err) { console.error("Yükleme hatası:", err); }
-    }
-
-    async function yeniVeriEkle() {
-        const uName = localStorage.getItem("aktif_kullanici");
-        const ayYil = document.getElementById("ayYil").value;
-        const veriTipi = document.getElementById("veriTipi").value;
-        const kategori = document.getElementById("kategori").value.trim();
-        const miktar = document.getElementById("miktar").value;
-        const aciklama = document.getElementById("aciklama").value.trim();
-        if (!ayYil || !miktar) { alert("Lütfen Dönem ve Miktar alanlarını doldurun!"); return; }
-
-        try {
-            const { error } = await butceClient
-                .from('kullanici_verileri')
-                .insert([{ username: uName, ay_yil: ayYil, veri_tipi: veriTipi, kategori: kategori, miktar: parseFloat(miktar), aciklama: aciklama }]);
-            if (error) throw error;
-            document.getElementById("kategori").value = ""; document.getElementById("miktar").value = ""; document.getElementById("aciklama").value = "";
-            verileriYukle(uName);
-        } catch (err) { alert("Ekleme hatası!"); console.error(err); }
-    }
-
-    async function veriSil(id) {
-        if (!confirm("Bu işlemi silmek istediğinize emin misiniz?")) return;
-        const uName = localStorage.getItem("aktif_kullanici");
-        try {
-            const { error } = await butceClient.from('kullanici_verileri').delete().eq('id', id);
-            if (error) throw error;
-            verileriYukle(uName);
-        } catch (err) { console.error(err); }
-    }
-</script>
-</body>
-</html>
+        } else {
+            try {
+                const { error } = await sb.from("sistem_kullanicilari").upsert({ username: uId, password: pass, email: email });
+                if (error) throw error;
+                alert("Kayıt Başarılı!");
+                modDegis();
+            } catch (err) {
