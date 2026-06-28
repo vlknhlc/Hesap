@@ -371,7 +371,7 @@
             }
         }
 
-        async function taksitlendirButonlu(id) {
+   async function taksitlendirButonlu(id) {
     const r = document.getElementById(id); 
     const ad = r.querySelector('.in-ad').value.trim();
     const tu = r.querySelector('.in-tu').value.trim(); 
@@ -384,50 +384,58 @@
         const n = parseInt(prompt("Kaç taksit yapmak istersiniz?")); 
         if(isNaN(n) || n <= 1) return;
         
-        // Asenkron kaydetme kilidini aç
+        // 1. ADIM: Otomatik kaydetmeleri kesin olarak kilitle
         isTaksitIslemiYapiliyor = true; 
         
         hafizayaKaydet(); 
         const yeniTaksitGrupId = "tks_" + Date.now(); 
-        r.remove(); // Bulanıklaşma (blur) tetiklenmeden DOM'dan kaldır
         
         const sy = document.getElementById('y-sel').value;
         const sm = document.getElementById('m-sel').value;
         
-        // Eşzamanlı döngü (Tıpkı eski kodundaki gibi sırayla ayları gezecek)
-        for(let i = 0; i < n; i++) {
-            let m = parseInt(sm) + i;
-            let y = parseInt(sy); 
-            if(m > 11) { y += Math.floor(m / 12); m = m % 12; }
-            
-            const dk = `${y}_${m}`; 
-            const ta = `${ad} (${i+1}/${n})`;
-            
-            // Supabase'den o dönemin verisini çek (Firebase .get() karşılığı)
-            const docData = await dbGet(dk);
-            
-            // Eğer döküman varsa içini al, yoksa temiz array başlat (Eski koddaki doc.exists kontrolü)
-            let gs = docData && docData.giderler ? docData.giderler : []; 
-            let gl = docData && (docData.gelirler || docData.gelatinler) ? (docData.gelirler || docData.gelatinler) : [];
-            
-            // Eski koddaki mantık: İlk ayda taksitsiz ham halini listeden temizle
-            if(i === 0) {
-                gs = gs.filter(x => x.ad.trim() !== ad);
-            }
-            
-            // Eski koddaki yarış durumu engeli: Eğer bu taksit ismi o ayda yoksa ekle
-            if(!gs.some(x => x.ad === ta)) {
-                gs.push({ad: ta, tu: tu, gu: gu, od: false, taksitId: yeniTaksitGrupId});
+        r.remove(); // Blur olayları tetiklenmeden DOM'dan hemen uçurıyoruz
+
+        // 2. ADIM: Güvenli sıralı kuyruk (Sequential Queue) oluşturma
+        // Arka arkaya gelen asenkron Supabase isteklerinin birbirini ezmesini engeller
+        try {
+            for(let i = 0; i < n; i++) {
+                let m = parseInt(sm) + i;
+                let y = parseInt(sy); 
+                if(m > 11) { y += Math.floor(m / 12); m = m % 12; }
                 
-                // Supabase'e güvenli yazım (Boş dizi olsa bile hata vermez)
-                await dbSet(dk, {giderler: gs, gelirler: gl});
+                const dk = `${y}_${m}`; 
+                const ta = `${ad} (${i+1}/${n})`;
+                
+                // Sırayla her ayın verisini bekle ve çek
+                const docData = await dbGet(dk);
+                
+                let gs = docData && docData.giderler ? docData.giderler : []; 
+                let gl = docData && (docData.gelirler || docData.gelatinler) ? (docData.gelirler || docData.gelatinler) : [];
+                
+                // İlk ayda asıl ham (taksitsiz) gideri temizle
+                if(i === 0) {
+                    gs = gs.filter(x => x.ad.trim() !== ad);
+                }
+                
+                // Mükerrer (çift) kayıt kontrolü
+                if(!gs.some(x => x.ad === ta)) {
+                    gs.push({ad: ta, tu: tu, gu: gu, od: false, taksitId: yeniTaksitGrupId});
+                    // Veritabanına yazma işleminin TAMAMEN bitmesini bekle
+                    await dbSet(dk, {giderler: gs, gelirler: gl});
+                }
             }
+            
+            // 3. ADIM: Tüm veritabanı yazma operasyonları BAŞARIYLA bittikten sonra kilidi aç ve haber ver
+            isTaksitIslemiYapiliyor = false; 
+            alert(`✅ Taksit grubu başarıyla oluşturuldu ve ${n} aya işlendi.`); 
+            
+        } catch (error) {
+            console.error("Taksitlendirme sırasında DB hatası:", error);
+            isTaksitIslemiYapiliyor = false;
+            alert("⚠️ Veritabanına yazılırken bir hata oluştu! Konsolu kontrol edin.");
         }
         
-        // Kilidi kaldır ve arayüzü tazeleyerek ekrana bas
-        isTaksitIslemiYapiliyor = false; 
-        alert(`Taksit grubu oluşturuldu ve ${n} aya işlendi.`); 
-        
+        // En son temiz veriyi çekip ekranı kusursuzca güncelliyoruz
         await verileriCek(); 
         await yillikRaporHesapla();
     }
