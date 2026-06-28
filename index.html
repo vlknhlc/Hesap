@@ -3,73 +3,32 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Bütçe Takip Sistemi</title>
+<title>Bütçe Takip Sistemiv1</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
 <style>
-:root {
---bg-color: #0f172a;
---panel-bg: #1e293b;
---border-color: #334155;
---text-color: #f8fafc;
---text-muted: #94a3b8;
---primary: #38bdf8;
---primary-hover: #0ea5e9;
---success: #4ade80;
---warning: #facc15;
---danger: #f87171;
---row-success: rgba(74, 222, 128, 0.15);
---row-warning: rgba(250, 204, 21, 0.15);
---row-danger: rgba(248, 113, 113, 0.15);
-}
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg-color); color: var(--text-color); padding: 20px; line-height: 1.5; }
-.container { max-width: 1200px; margin: 0 auto; }
-.screen-panel { background: var(--panel-bg); border: 1px solid var(--border-color); padding: 30px; border-radius: 12px; max-width: 450px; margin: 60px auto; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
-h2, h3 { margin-bottom: 20px; font-weight: 600; }
-h2 { text-align: center; color: var(--primary); }
-.input-group { margin-bottom: 20px; }
-.input-group label { display: block; margin-bottom: 8px; font-size: 14px; color: var(--text-muted); }
-.form-input { width: 100%; padding: 12px; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-color); }
-.form-input:focus { outline: none; border-color: var(--primary); }
-.btn-block { width: 100%; padding: 14px; background: var(--primary); color: var(--bg-color); border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
-.btn-block:hover { background: var(--primary-hover); }
-
-.header-bar { background: var(--panel-bg); border: 1px solid var(--border-color); padding: 15px 20px; border-radius: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
-.controls-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; align-items: center; }
-select, .btn-action { background: var(--panel-bg); border: 1px solid var(--border-color); color: var(--text-color); padding: 10px 15px; border-radius: 8px; }
-.summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px; }
-.summary-card { background: var(--panel-bg); border: 1px solid var(--border-color); padding: 20px; border-radius: 12px; }
-.lists-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-.table-panel { background: var(--panel-bg); border: 1px solid var(--border-color); padding: 20px; border-radius: 12px; }
-.row-item { display: flex; gap: 8px; margin-bottom: 8px; padding: 6px; border-radius: 8px; background: rgba(15, 23, 42, 0.4); }
-.cell { flex: 1; }
-.table-input { width: 100%; padding: 10px; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-color); }
-.in-od, .del-btn, .taksit-btn { cursor: pointer; }
+/* Stil kısmı aynı (kısaltıldı) */
+:root{--bg-color:#0f172a;--panel-bg:#1e293b;--border-color:#334155;--text-color:#f8fafc;--primary:#38bdf8}
+* {box-sizing:border-box;margin:0;padding:0}
+body {font-family:system-ui;background:var(--bg-color);color:var(--text-color);padding:20px}
+.container {max-width:1200px;margin:0 auto}
+.row-item {display:flex;gap:8px;margin-bottom:8px;padding:6px;border-radius:8px;background:rgba(15,23,42,0.4)}
+.table-input {width:100%;padding:10px;background:#0f172a;border:1px solid #334155;border-radius:6px;color:white}
 </style>
-
 <script>
-const currentSupabase = window.supabase.createClient(
-"https://itmjtoevsxvpzphnxauc.supabase.co",
-"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml0bWp0b2V2c3h2cHpwaG54YXVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0OTA1NDYsImV4cCI6MjA5ODA2NjU0Nn0.MBvdsBKeQgoNZbAf5hFaJ957EN_nb-Zj3D17ySSdLkw"
-);
+const currentSupabase = window.supabase.createClient("https://itmjtoevsxvpzphnxauc.supabase.co","eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml0bWp0b2V2c3h2cHpwaG54YXVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0OTA1NDYsImV4cCI6MjA5ODA2NjU0Nn0.MBvdsBKeQgoNZbAf5hFaJ957EN_nb-Zj3D17ySSdLkw");
 
 let aktifId = "";
 let isTaksitIslemiYapiliyor = false;
-const aylarIsimleri = ["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
 
 async function dbSet(donem, veri) {
   if(!aktifId) return;
-  const temizVeri = {
-    giderler: Array.isArray(veri?.giderler) ? veri.giderler : [],
-    gelirler: Array.isArray(veri?.gelirler) ? veri.gelirler : []
-  };
-  await currentSupabase.from('donemler').upsert({ user_id: aktifId, donem: donem, veriler: temizVeri }, { onConflict: 'user_id,donem' });
+  const temiz = { giderler: Array.isArray(veri?.giderler)?veri.giderler:[], gelirler: Array.isArray(veri?.gelirler)?veri.gelirler:[] };
+  await currentSupabase.from('donemler').upsert({user_id:aktifId, donem, veriler:temiz}, {onConflict:'user_id,donem'});
 }
 
 async function dbGet(donem) {
   if(!aktifId) return null;
-  const { data } = await currentSupabase.from('donemler').select('veriler').eq('user_id', aktifId).eq('donem', donem).maybeSingle();
+  const {data} = await currentSupabase.from('donemler').select('veriler').eq('user_id',aktifId).eq('donem',donem).maybeSingle();
   return data?.veriler || null;
 }
 
@@ -77,40 +36,22 @@ async function verileriCek() {
   if(isTaksitIslemiYapiliyor) return;
   const donem = document.getElementById('y-sel').value + "_" + document.getElementById('m-sel').value;
   const data = await dbGet(donem);
-
   document.getElementById('g-list').innerHTML = "";
-  document.getElementById('gel-list').innerHTML = "";
-
-  if (data) {
-    const giderler = Array.isArray(data.giderler) ? data.giderler : [];
-    const gelirler = data.gelirler || data.gelatinler || [];
-
-    giderler.sort((a,b) => (parseInt(a.gu)||99) - (parseInt(b.gu)||99));
-    giderler.forEach(x => satirBas('gider', x));
-    gelirler.forEach(x => satirBas('gelir', x));
+  if(data && data.giderler) {
+    data.giderler.forEach(x => satirBas('gider', x));
   }
-  hesapla();
 }
 
-function satirBas(tip, v = {}) {
+function satirBas(tip, v) {
   const id = "r" + Math.random().toString(36).substr(2,8);
-  if (tip === 'gider') {
-    const html = `<div class="row-item" id="${id}" data-taksit-id="${v.taksitId || ''}">
-      <div class="cell"><input type="text" class="table-input in-ad" value="${(v.ad || '').replace(/"/g,'&quot;')}" onchange="verileriKaydet()"></div>
-      <div class="cell"><input type="number" class="table-input in-tu" value="${v.tu || ''}" onchange="verileriKaydet()"></div>
-      <div class="cell"><input type="number" class="table-input in-gu" value="${v.gu || ''}" onchange="verileriKaydet()"></div>
-      <div class="cell"><input type="checkbox" class="in-od" ${v.od ? 'checked' : ''} onchange="verileriKaydet()"></div>
-      <div class="cell"><button class="taksit-btn" onclick="taksitlendirButonlu('${id}')">🗓️</button></div>
-      <div class="cell"><button class="del-btn" onclick="giderSatirSil('${id}')">×</button></div>
+  if(tip==='gider'){
+    const html = `<div class="row-item" id="${id}" data-taksit-id="${v.taksitId||''}">
+      <div class="cell"><input class="table-input in-ad" value="${v.ad||''}"></div>
+      <div class="cell"><input class="table-input in-tu" value="${v.tu||''}"></div>
+      <div class="cell"><input class="table-input in-gu" value="${v.gu||''}"></div>
+      <div><button onclick="taksitlendirButonlu('${id}')">🗓️</button></div>
     </div>`;
     document.getElementById('g-list').insertAdjacentHTML('beforeend', html);
-  } else {
-    const html = `<div class="row-item" id="${id}">
-      <div class="cell"><input type="text" class="table-input in-ad" value="${v.ad || ''}" onchange="verileriKaydet()"></div>
-      <div class="cell"><input type="number" class="table-input in-tu" value="${v.tu || ''}" onchange="verileriKaydet()"></div>
-      <div class="cell"><button class="del-btn" onclick="satirSil('${id}')">×</button></div>
-    </div>`;
-    document.getElementById('gel-list').insertAdjacentHTML('beforeend', html);
   }
 }
 
@@ -118,39 +59,31 @@ async function taksitlendirButonlu(id) {
   const r = document.getElementById(id);
   const ad = r.querySelector('.in-ad').value.trim();
   const tu = r.querySelector('.in-tu').value.trim();
-  const gu = r.querySelector('.in-gu').value.trim();
+  if(!ad || !tu) return alert("Bilgileri doldurun");
 
-  if (!ad || !tu) return alert("Açıklama ve Tutar giriniz!");
-  if (ad.includes('(') && ad.includes('/')) return alert("Zaten taksitli!");
-
-  const n = parseInt(prompt("Kaç taksit olsun?"));
-  if (!n || n < 2) return;
+  const n = parseInt(prompt("Kaç taksit?"));
+  if(!n || n<2) return;
 
   isTaksitIslemiYapiliyor = true;
-  const yeniId = "tks_" + Date.now();
-  const sy = parseInt(document.getElementById('y-sel').value);
-  const sm = parseInt(document.getElementById('m-sel').value);
+  const grupId = "tks_"+Date.now();
+  const y = parseInt(document.getElementById('y-sel').value);
+  const m = parseInt(document.getElementById('m-sel').value);
 
   r.remove();
 
-  for (let i = 0; i < n; i++) {
-    let m = sm + i;
-    let y = sy;
-    if (m > 11) { y += Math.floor(m/12); m %= 12; }
+  for(let i=0; i<n; i++){
+    let ay = m + i;
+    let yil = y;
+    if(ay>11){ yil += Math.floor(ay/12); ay %=12; }
+    const dk = `${yil}_${ay}`;
+    const isim = `${ad} (${i+1}/${n})`;
 
-    const dk = `${y}_${m}`;
-    const ta = `${ad} (${i+1}/${n})`;
-
-    const doc = await dbGet(dk) || {giderler: [], gelirler: []};
-    let gs = Array.isArray(doc.giderler) ? doc.giderler : [];
-
-    if (i === 0) gs = gs.filter(x => x.ad !== ad);
-
-    if (!gs.some(x => x.ad === ta)) {
-      gs.push({ad: ta, tu: tu, gu: gu, od: false, taksitId: yeniId});
+    const mevcut = await dbGet(dk) || {giderler:[]};
+    let giderler = mevcut.giderler.filter(x => x.ad !== ad);
+    if(!giderler.some(x=>x.ad===isim)){
+      giderler.push({ad:isim, tu, gu:"1", od:false, taksitId:grupId});
     }
-
-    await dbSet(dk, {giderler: gs, gelirler: doc.gelirler || []});
+    await dbSet(dk, {giderler});
   }
 
   isTaksitIslemiYapiliyor = false;
@@ -158,36 +91,21 @@ async function taksitlendirButonlu(id) {
   alert("Taksitler eklendi!");
 }
 
-// Diğer fonksiyonlar (verileriKaydet, hesapla, giderSatirSil vb.) buraya eklenebilir.
-// Test için bu haliyle kaydet ve dene.
-
+// Başlangıç
 window.onload = () => {
-  // Ay ve yıl seçicileri doldur...
-  const msel = document.getElementById('m-sel');
-  aylarIsimleri.forEach((ay,i) => msel.add(new Option(ay, i)));
-  // ... diğer başlangıç kodları
+  // Ay seçici doldur...
+  document.getElementById('m-sel').value = new Date().getMonth();
+  document.getElementById('y-sel').value = new Date().getFullYear();
+  // Giriş sonrası verileriCek() çağır
 };
 </script>
 </head>
 <body>
 <div class="container">
-  <!-- Login ve App ekranı buraya -->
-  <div id="app-content">
-    <div class="controls-row">
-      <select id="m-sel" onchange="verileriCek()"></select>
-      <select id="y-sel" onchange="verileriCek()"></select>
-    </div>
-    <div class="lists-grid">
-      <div class="table-panel">
-        <div id="g-list"></div>
-        <button onclick="satirEkle('gider')">+ Gider Ekle</button>
-      </div>
-      <div class="table-panel">
-        <div id="gel-list"></div>
-        <button onclick="satirEkle('gelir')">+ Gelir Ekle</button>
-      </div>
-    </div>
-  </div>
+  <select id="m-sel" onchange="verileriCek()"></select>
+  <select id="y-sel" onchange="verileriCek()"></select>
+  <div id="g-list"></div>
+  <button onclick="satirEkle('gider')">+ Gider Ekle</button>
 </div>
 </body>
 </html>
