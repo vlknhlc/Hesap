@@ -384,7 +384,7 @@
         const n = parseInt(prompt("Kaç taksit yapmak istersiniz?")); 
         if(isNaN(n) || n <= 1) return;
         
-        // Otomatik blur/kaydetme tetiklenmelerini engellemek için kilitle
+        // Diğer input tetiklenmelerini engellemek için kilitle
         isTaksitIslemiYapiliyor = true; 
         
         hafizayaKaydet(); 
@@ -393,11 +393,10 @@
         const sy = document.getElementById('y-sel').value;
         const sm = document.getElementById('m-sel').value;
         
-        // Seçili satırı DOM'dan uçur
+        // Blur olayı veritabanını ezmesin diye DOM'dan hemen siliyoruz
         r.remove(); 
 
         try {
-            // Döngü boyunca tüm işlemleri sırayla bitireceğiz
             for(let i = 0; i < n; i++) {
                 let m = parseInt(sm) + i;
                 let y = parseInt(sy); 
@@ -410,38 +409,37 @@
                 const docData = await dbGet(dk);
                 
                 let gs = docData && docData.giderler ? docData.giderler : []; 
-                let gl = docData && (docData.gelirler || docData.gelatinler) ? (docData.gelirler || docData.gelatinler) : [];
+                // Eski koddaki tüm gelir varyasyonlarını güvenle yakala
+                let gl = docData && (docData.gelirler || docData.gelatinler || docData.gelir) ? (docData.gelirler || docData.gelatinler || docData.gelir) : [];
                 
-                // İlk ayda asıl eklediğimiz taksitsiz ana harcamayı temizle
+                // İlk ayda asıl eklediğimiz taksitsiz ham harcamayı temizle
                 if(i === 0) {
                     gs = gs.filter(x => x.ad.trim() !== ad);
                 }
                 
-                // Mükerrer kontrolü yap ve listeye ekle
+                // Eğer bu taksit o aya daha önce eklenmediyse push'la
                 if(!gs.some(x => x.ad === ta)) {
                     gs.push({ad: ta, tu: tu, gu: gu, od: false, taksitId: yeniTaksitGrupId});
                     
-                    // Veritabanına yazılmasını KESİN olarak bekle
-                    await dbSet(dk, {giderler: gs, gelirler: gl});
+                    // KRİTİK DÜZELTME: Eski kodundaki gibi hem gelirler hem gelatinler anahtarını aynı anda yazıyoruz!
+                    await dbSet(dk, {
+                        giderler: gs, 
+                        gelirler: gl,
+                        gelatinler: gl
+                    });
                 }
             }
             
-            // KİLİT NOKTA: Döngü bitti, kilidi açıyoruz
             isTaksitIslemiYapiliyor = false; 
-            alert(`✅ Taksit grubu oluşturuldu ve ${n} aya işlendi.`);
+            alert(`✅ Taksit grubu başarıyla oluşturuldu ve ${n} aya işlendi.`);
             
         } catch (error) {
             console.error("Taksitlendirme sırasında hata:", error);
             isTaksitIslemiYapiliyor = false;
         }
         
-        // Ekrana düşmeme sorununu çözmek için:
-        // Önce verileri arka planda çek, ardından arayüzü render eden fonksiyonu (adı listede neyse, örn: GiderleriListele() veya Yenile()) zorla tetikle
+        // Verileri çekip ekranı tazelemeye zorla
         await verileriCek(); 
-        if (typeof listelemeFonksiyonu === "function") { 
-            // Eğer projede ekrana basmayı sağlayan ayrı bir render fonksiyonu varsa onu buraya yazmalısın reis
-            listelemeFonksiyonu(); 
-        }
         await yillikRaporHesapla();
     }
 }
