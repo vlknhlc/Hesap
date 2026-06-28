@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Bütçe Takip Pro v22.1 + Akıllı AI</title>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
     <style>
         :root { 
             --primary: #2c3e50; --accent: #3498db; --danger: #e74c3c; --success: #27ae60; --warning: #f39c12;
@@ -165,16 +165,13 @@
 </div>
 
 <script>
-    const config = {
-        apiKey: "AIzaSyB2AtnX-D7Wv1_ONCc3nhOrQgAK4RWWPiE",
-        authDomain: "butcetakip-1addc.firebaseapp.com",
-        projectId: "butcetakip-1addc",
-        storageBucket: "butcetakip-1addc.firebasestorage.app",
-        messagingSenderId: "657917369506",
-        appId: "1:657917369506:web:8b3e9224f5ccd817eccbfb"
-    };
-    firebase.initializeApp(config);
-    const db = firebase.firestore();
+    const supabase = window.supabase.createClient(
+
+"https://itmjtoevsxvpzphnxauc.supabase.co",
+
+"sb_publishable_L7HzzWwk6-VMZN3aNDNSWQ_LToJsfjn"
+
+);
 
     const GEMINI_API_KEY = "AIzaSyAbD6sO0u5zmWSO_ICEbLz3kJNpOWtYiLw"; 
 
@@ -191,37 +188,61 @@
         document.getElementById('log-toggle-link').innerText = isLogMode ? "Yeni Hesap Oluştur" : "Zaten Hesabım Var";
     }
 
-    function authHareketi() {
-        const email = document.getElementById('log-email').value.trim().toLowerCase();
-        const pass = document.getElementById('log-pass').value;
-        if(!email || !pass) { alert("Boş bırakmayın!"); return; }
-        const uId = email.replace(/\./g, "_");
-        if(isLogMode) {
-            db.collection("sistem_kullanicilari").doc(uId).get().then(doc => {
-                if(doc.exists && doc.data().password == pass) {
-                    aktifId = uId;
-                    document.getElementById('user-display').innerText = email;
-                    document.getElementById('login-screen').style.display = 'none';
-                    document.getElementById('app-content').style.display = 'block';
-                    verileriCek(true);
-                } else alert("Hatalı giriş!");
-            });
-        } else {
-            db.collection("sistem_kullanicilari").doc(uId).set({password: pass, email: email}).then(() => {
-                alert("Kayıt Başarılı!");
-                modDegis();
-            });
-        }
-    }
+    async function authHareketi() {{
 
-    function sifreHatirlat() {
-        const email = document.getElementById('log-email').value.trim().toLowerCase();
-        if(!email) return alert("E-posta yazın!");
-        db.collection("sistem_kullanicilari").doc(email.replace(/\./g, "_")).get().then(doc => {
-            if(doc.exists) alert("Şifreniz: " + doc.data().password);
-            else alert("Bulunamadı!");
-        });
-    }
+const email = document.getElementById('log-email').value.trim().toLowerCase();
+
+const pass = document.getElementById('log-pass').value;
+
+if(!email || !pass) return alert("Boş bırakmayın!");
+
+if(isLogMode) {{
+
+const {{ data, error }} = await supabase.auth.signInWithPassword({{ email, password: pass }});
+
+if(error) return alert("Hatalı giriş: " + error.message);
+
+aktifId = data.user.id;
+
+document.getElementById('user-display').innerText = email;
+
+document.getElementById('login-screen').style.display = 'none';
+
+document.getElementById('app-content').style.display = 'block';
+
+verileriCek(true);
+
+}} else {{
+
+const {{ error }} = await supabase.auth.signUp({{ email, password: pass }});
+
+if(error) return alert("Kayıt hatası: " + error.message);
+
+alert("Kayıt başarılı! E-posta doğrulama gerekebilir.");
+
+modDegis();
+
+}}
+
+}}
+
+    async function sifreHatirlat() {{
+
+const email = document.getElementById('log-email').value.trim().toLowerCase();
+
+if(!email) return alert("E-posta yazın!");
+
+const {{ error }} = await supabase.auth.resetPasswordForEmail(email, {{
+
+redirectTo: window.location.origin
+
+}});
+
+if(error) return alert(error.message);
+
+alert("Şifre sıfırlama bağlantısı e-postanıza gönderildi.");
+
+}}
 
     window.onload = function() {
         const m = document.getElementById('m-sel'), y = document.getElementById('y-sel'), yy = document.getElementById('yillik-y-sel');
