@@ -372,68 +372,66 @@
         }
 
         async function taksitlendirButonlu(id) {
-            const r = document.getElementById(id); 
-            const ad = r.querySelector('.in-ad').value.trim();
-            const tu = r.querySelector('.in-tu').value.trim(); 
-            const gu = r.querySelector('.in-gu').value.trim();
+    const r = document.getElementById(id); 
+    const ad = r.querySelector('.in-ad').value.trim();
+    const tu = r.querySelector('.in-tu').value.trim(); 
+    const gu = r.querySelector('.in-gu').value.trim();
+    
+    if(!ad || !tu) { alert("⚠️ Lütfen önce harcamanın Açıklama ve Tutar alanlarını doldurun!"); return; }
+    if(ad.includes('/') || /\(\d+\/\d+\)$/.test(ad)) { alert("⚠️ Bu harcama zaten taksitlendirilmiş görünüyor!"); return; }
+    
+    if(confirm(`"${ad}" harcamasını taksitlendirmek istiyor musunuz?`)) {
+        const n = parseInt(prompt("Kaç taksit yapmak istersiniz?")); 
+        if(isNaN(n) || n <= 1) return;
+        
+        // Asenkron kaydetme kilidini aç
+        isTaksitIslemiYapiliyor = true; 
+        
+        hafizayaKaydet(); 
+        const yeniTaksitGrupId = "tks_" + Date.now(); 
+        r.remove(); // Bulanıklaşma (blur) tetiklenmeden DOM'dan kaldır
+        
+        const sy = document.getElementById('y-sel').value;
+        const sm = document.getElementById('m-sel').value;
+        
+        // Eşzamanlı döngü (Tıpkı eski kodundaki gibi sırayla ayları gezecek)
+        for(let i = 0; i < n; i++) {
+            let m = parseInt(sm) + i;
+            let y = parseInt(sy); 
+            if(m > 11) { y += Math.floor(m / 12); m = m % 12; }
             
-            if(!ad || !tu) { alert("Açıklama ve Tutar girmelisiniz!"); return; }
+            const dk = `${y}_${m}`; 
+            const ta = `${ad} (${i+1}/${n})`;
             
-            const n = parseInt(prompt(`"${ad}" harcamasını kaç taksit yapmak istersiniz?`)); 
-            if(isNaN(n) || n <= 1) return;
+            // Supabase'den o dönemin verisini çek (Firebase .get() karşılığı)
+            const docData = await dbGet(dk);
             
-            // 1. KRİTİK GÜVENLİK: KİLİDİ ANINDA ÇAKIYORUZ
-            isTaksitIslemiYapiliyor = true; 
-            const yeniTaksitGrupId = "tks_" + Date.now(); 
+            // Eğer döküman varsa içini al, yoksa temiz array başlat (Eski koddaki doc.exists kontrolü)
+            let gs = docData && docData.giderler ? docData.giderler : []; 
+            let gl = docData && (docData.gelirler || docData.gelatinler) ? (docData.gelirler || docData.gelatinler) : [];
             
-            const sy = document.getElementById('y-sel').value; 
-            const sm = document.getElementById('m-sel').value;
-            
-            // 2. DOM'DAN VERİ ALIRKEN SEÇİLENİ DİREKT DIŞLAYALIM
-            const gids = [], gels = [];
-            document.querySelectorAll('#g-list .row-item').forEach(row => {
-                if(row.id === id) return; 
-                const rowAd = row.querySelector('.in-ad').value; const rowTu = row.querySelector('.in-tu').value;
-                if(rowAd || rowTu) gids.push({ad: rowAd, tu: rowTu, gu: row.querySelector('.in-gu').value, od: row.querySelector('.in-od').checked, taksitId: row.dataset.taksitId || ""});
-            });
-            document.querySelectorAll('#gel-list .row-item').forEach(row => {
-                const rowAd = row.querySelector('.in-ad').value; const rowTu = row.querySelector('.in-tu').value;
-                if(rowAd || rowTu) gels.push({ad: rowAd, tu: rowTu});
-            });
-            
-            r.remove(); // Bulanıklaşma (Blur) tetiklenmeden DOM elemanını hemen yok et.
-
-            // 3. TAMAMEN SENKRON DAĞITIM DÖNGÜSÜ (AWAIT YAPILARI ARTIK BİRBİRİNİ BEKLER VE SIFIR HATA ÜRETİR)
-            for(let i=0; i<n; i++) {
-                let m = parseInt(sm) + i; 
-                let y = parseInt(sy); 
-                if(m > 11) { y += Math.floor(m / 12); m = m % 12; }
-                
-                const dk = `${y}_${m}`; 
-                const ta = `${ad} (${i+1}/${n})`;
-                
-                if (i === 0) {
-                    // Mevcut ayı kaydet
-                    gids.push({ad: ta, tu: tu, gu: gu, od: false, taksitId: yeniTaksitGrupId});
-                    await dbSet(dk, {giderler: gids, gelirler: gels});
-                } else {
-                    // Gelecek ayları güvenle çek ve Postgresql şemasına uygun biçimde ayağa kaldır
-                    const docData = await dbGet(dk);
-                    let gs = docData && docData.giderler ? docData.giderler : []; 
-                    let gl = docData && (docData.gelirler || docData.gelatinler) ? (docData.gelirler || docData.gelatinler) : [];
-                    
-                    gs.push({ad: ta, tu: tu, gu: gu, od: false, taksitId: yeniTaksitGrupId});
-                    await dbSet(dk, {giderler: gs, gelirler: gl});
-                }
+            // Eski koddaki mantık: İlk ayda taksitsiz ham halini listeden temizle
+            if(i === 0) {
+                gs = gs.filter(x => x.ad.trim() !== ad);
             }
             
-            // 4. İŞLEM BİTTİ, KİLİDİ AÇ VE TAM TEMİZ VERİ ÇEK
-            isTaksitIslemiYapiliyor = false; 
-            alert(`Taksit işlemi başarıyla tamamlandı. ${n} aya dağıtıldı.`); 
-            
-            await verileriCek(); 
-            await yillikRaporHesapla();
+            // Eski koddaki yarış durumu engeli: Eğer bu taksit ismi o ayda yoksa ekle
+            if(!gs.some(x => x.ad === ta)) {
+                gs.push({ad: ta, tu: tu, gu: gu, od: false, taksitId: yeniTaksitGrupId});
+                
+                // Supabase'e güvenli yazım (Boş dizi olsa bile hata vermez)
+                await dbSet(dk, {giderler: gs, gelirler: gl});
+            }
         }
+        
+        // Kilidi kaldır ve arayüzü tazeleyerek ekrana bas
+        isTaksitIslemiYapiliyor = false; 
+        alert(`Taksit grubu oluşturuldu ve ${n} aya işlendi.`); 
+        
+        await verileriCek(); 
+        await yillikRaporHesapla();
+    }
+}
 
         function satirlariRenklendir() {
             const bugunTS = new Date(); const bugunGun = bugunTS.getDate();
