@@ -323,7 +323,7 @@
                     const dk = `${y}_${m}`; const d = await dbGet(dk);
                     if(d && d.giderler) {
                         let yeniGiderler = d.giderler.filter(x => x.taksitId !== tId);
-                        await dbSet(dk, {giderler: yeniGiderler, gelatinler: [], gelirler: d.gelirler || []});
+                        await dbSet(dk, {giderler: yeniGiderler, gelatinler: d.gelirler || []});
                     }
                 }
                 alert("Taksit grubu gelecek aylardan temizlendi."); setTimeout(verileriCek, 1000);
@@ -365,16 +365,20 @@
             const n = parseInt(prompt(`"${ad}" harcamasını kaç taksit yapmak istersiniz?`)); 
             if(isNaN(n) || n <= 1) return;
             
+            // KRİTİK DÜZELTME: Giriş yapıldığı an hemen bayrağı kaldırıp asenkron tetiklenmeleri durduruyoruz
             isTaksitIslemiYapiliyor = true; 
             const yeniTaksitGrupId = "tks_" + Date.now(); 
             
             const sy = document.getElementById('y-sel').value; 
             const sm = document.getElementById('m-sel').value;
             
-            // Ekranda açık olan mevcut verileri güvenli oku
+            // KRİTİK DÜZELTME 2: Eski satırı hiçbir await işlemine girmeden milisaniyeler içinde DOM'dan derhal uçuruyoruz.
+            // Böylece input blurlanıp onchange tetiklese bile sistem eski satırı bulamaz ve veritabanına geri yazamaz.
+            r.remove();
+
+            // Ekrandaki diğer aktif ve güncel verileri topla (Taksitlendirilen satır hariç)
             const gids = [], gels = [];
             document.querySelectorAll('#g-list .row-item').forEach(row => {
-                if(row.id === id) return;
                 const rowAd = row.querySelector('.in-ad').value; const rowTu = row.querySelector('.in-tu').value;
                 if(rowAd || rowTu) gids.push({ad: rowAd, tu: rowTu, gu: row.querySelector('.in-gu').value, od: row.querySelector('.in-od').checked, taksitId: row.dataset.taksitId || ""});
             });
@@ -383,9 +387,7 @@
                 if(rowAd || rowTu) gels.push({ad: rowAd, tu: rowTu});
             });
 
-            // Eşzamanlı Supabase istek kuyruğu oluşturuyoruz (Kilitlenmeyi önler)
-            const promises = [];
-
+            // Gelecek aylara taksitleri sırayla dağıtıyoruz
             for(let i=0; i<n; i++) {
                 let m = parseInt(sm) + i; 
                 let y = parseInt(sy); 
@@ -395,34 +397,26 @@
                 const ta = `${ad} (${i+1}/${n})`;
                 
                 if (i === 0) {
+                    // Mevcut ay için taksitli veriyi ekleyip veritabanına set et
                     gids.push({ad: ta, tu: tu, gu: gu, od: false, taksitId: yeniTaksitGrupId});
-                    promises.push(dbSet(dk, {giderler: gids, gelirler: gels}));
+                    await dbSet(dk, {giderler: gids, gelirler: gels});
                 } else {
-                    // Gelecek aylar için asenkron yapıyı bağımsız bir fonksiyona bağlayıp kuyruğa atıyoruz
-                    const f = async (donemAnahtari, taksitBasligi) => {
-                        const docData = await dbGet(donemAnahtari);
-                        let gs = docData && docData.giderler ? docData.giderler : []; 
-                        let gl = docData && (docData.gelirler || docData.gelatinler) ? (docData.gelirler || docData.gelatinler) : [];
-                        gs.push({ad: taksitBasligi, tu: tu, gu: gu, od: false, taksitId: yeniTaksitGrupId});
-                        await dbSet(donemAnahtari, {giderler: gs, gelirler: gl});
-                    };
-                    promises.push(f(dk, ta));
+                    // Gelecek aylar için veritabanındaki mevcut diziyi al, üstüne ekle
+                    const docData = await dbGet(dk);
+                    let gs = docData && docData.giderler ? docData.giderler : []; 
+                    let gl = docData && (docData.gelirler || docData.gelatinler) ? (docData.gelirler || docData.gelatinler) : [];
+                    
+                    gs.push({ad: ta, tu: tu, gu: gu, od: false, taksitId: yeniTaksitGrupId});
+                    await dbSet(dk, {giderler: gs, gelirler: gl});
                 }
             }
             
-            try {
-                // Tüm ayları tek bir pakette kaydet
-                await Promise.all(promises);
-                r.remove();
-                alert(`Taksit işlemi başarıyla tamamlandı. ${n} aya dağıtıldı.`); 
-            } catch (err) {
-                console.error(err);
-                alert("Veritabanı kaydı sırasında bir hata oluştu!");
-            } finally {
-                isTaksitIslemiYapiliyor = false; 
-                await verileriCek(); 
-                await yillikRaporHesapla();
-            }
+            alert(`Taksit işlemi başarıyla tamamlandı. ${n} aya dağıtıldı.`); 
+            isTaksitIslemiYapiliyor = false; 
+            
+            // Arayüzü ve yıllık raporları yenile
+            await verileriCek(); 
+            await yillikRaporHesapla();
         }
 
         function satirlariRenklendir() {
@@ -547,4 +541,46 @@
                 <div class="summary-card"><div class="title">Toplam Gelir</div><div id="res-tgel" style="color:var(--success);">0 TL</div></div>
                 <div class="summary-card"><div class="title">Toplam Gider</div><div id="res-tg" style="color:var(--danger);">0 TL</div></div>
                 <div class="summary-card"><div class="title">Ödenecek Kalan</div><div id="res-kalan" style="color:var(--warning);">0 TL</div></div>
-                <div class="summary-card"><div class="title">Net Durum</div><div id="
+                <div class="summary-card"><div class="title">Net Durum</div><div id="res-denge">0 TL</div></div>
+            </div>
+
+            <div class="progress-container">
+                <div id="progress-bar" class="progress-bar"></div>
+                <span id="progress-percent" class="progress-text">%0</span>
+            </div>
+
+            <div class="lists-grid">
+                <div class="table-panel">
+                    <div class="panel-title"><span>💰 Aylık Gelirler</span><button onclick="satirEkle('gelir')">+ Gelir Ekle</button></div>
+                    <div id="gel-list"></div>
+                </div>
+                <div class="table-panel">
+                    <div class="panel-title"><span>💸 Aylık Giderler</span><button onclick="satirEkle('gider')">+ Gider Ekle</button></div>
+                    <div id="g-list"></div>
+                </div>
+            </div>
+
+            <div class="table-panel" style="margin-top: 20px;">
+                <h3 style="color:var(--primary);">📊 Yıllık Bütçe Dağılımı</h3>
+                <div style="margin-bottom: 15px; display:flex; gap:10px;">
+                    <select id="yillik-y-sel"></select>
+                    <button class="btn-action" onclick="yillikRaporHesapla()">Raporu Yenile</button>
+                </div>
+                <div id="yillik-rapor-listesi" class="report-grid"></div>
+            </div>
+
+            <div class="table-panel" style="margin-top: 20px; border-color: rgba(56, 189, 248, 0.3);">
+                <h3 style="color:var(--primary); margin-bottom:10px;">🤖 Akıllı Yapay Zeka Asistanı</h3>
+                <div id="ai-chat-box" class="chat-box">
+                    <div class="msg ai">Selam! Toplu bütçe işlemlerini tek komutla buraya yazarak bana yaptırabilirsin.</div>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <input type="text" id="ai-user-input" class="form-input" style="padding:10px;" placeholder="Örn: Her aya 2500 TL Aidat ekle..." onkeydown="if(event.key === 'Enter') aiMesajGonder()">
+                    <button onclick="aiMesajGonder()" class="btn-action" style="background:var(--primary); color:var(--bg-color); font-weight:600;">Gönder</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
