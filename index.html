@@ -347,26 +347,67 @@
         }
 
         async function taksitlendirButonlu(id) {
-            const r = document.getElementById(id); const ad = r.querySelector('.in-ad').value.trim();
-            const tu = r.querySelector('.in-tu').value.trim(); const gu = r.querySelector('.in-gu').value.trim();
+            const r = document.getElementById(id); 
+            const ad = r.querySelector('.in-ad').value.trim();
+            const tu = r.querySelector('.in-tu').value.trim(); 
+            const gu = r.querySelector('.in-gu').value.trim();
+            
             if(!ad || !tu) { alert("Açıklama ve Tutar girmelisiniz!"); return; }
+            
             if(confirm(`"${ad}" bütçesini taksitlendirmek istiyor musunuz?`)) {
-                const n = parseInt(prompt("Kaç taksit yapılacak?")); if(isNaN(n) || n <= 1) return;
-                hafizayaKaydet(); const yeniTaksitGrupId = "tks_" + Date.now(); r.remove();
-                const sy = document.getElementById('y-sel').value, sm = document.getElementById('m-sel').value;
+                const n = parseInt(prompt("Kaç taksit yapılacak?")); 
+                if(isNaN(n) || n <= 1) return;
+                
+                hafizayaKaydet(); 
+                const yeniTaksitGrupId = "tks_" + Date.now(); 
+                r.remove(); // Mevcut satırı ekrandan kaldırıyoruz
+                
+                const sy = document.getElementById('y-sel').value; 
+                const sm = document.getElementById('m-sel').value;
+                
+                // İlk önce mevcut ekran verilerini veritabanına kaydedelim ki o ayki diğer gelir/giderler kaybolmasın
+                 siralaArayuz();
+                 const donem = sy + "_" + sm;
+                 const gids = [], gels = [];
+                 document.querySelectorAll('#g-list .row-item').forEach(row => {
+                     const rowAd = row.querySelector('.in-ad').value; const rowTu = row.querySelector('.in-tu').value;
+                     if(rowAd || rowTu) gids.push({ad: rowAd, tu: rowTu, gu: row.querySelector('.in-gu').value, od: row.querySelector('.in-od').checked, taksitId: row.dataset.taksitId || ""});
+                 });
+                 document.querySelectorAll('#gel-list .row-item').forEach(row => {
+                     const rowAd = row.querySelector('.in-ad').value; const rowTu = row.querySelector('.in-tu').value;
+                     if(rowAd || rowTu) gels.push({ad: rowAd, tu: rowTu});
+                 });
+                 await dbSet(donem, {giderler: gids, gelirler: gels});
+
+                // Şimdi döngüyle tüm taksit aylarını planlayalım
                 for(let i=0; i<n; i++) {
-                    let m = parseInt(sm)+i, y = parseInt(sy); if(m>11) { y += Math.floor(m/12); m = m%12; }
-                    const dk = `${y}_${m}`, ta = `${ad} (${i+1}/${n})`;
+                    let m = parseInt(sm) + i; 
+                    let y = parseInt(sy); 
+                    if(m > 11) { y += Math.floor(m / 12); m = m % 12; }
+                    
+                    const dk = `${y}_${m}`; 
+                    const ta = `${ad} (${i+1}/${n})`;
+                    
+                    // İlgili ayın mevcut verilerini çekelim
                     const docData = await dbGet(dk);
-                    let gs = docData ? (docData.giderler || []) : []; let gl = docData ? (docData.gelirler || []) : [];
+                    let gs = docData && docData.giderler ? docData.giderler : []; 
+                    let gl = docData && docData.gelirler ? docData.gelirler : [];
+                    
+                    // Eğer ilk aysa ve eski isimle kalmış bir kopya varsa temizleyelim
                     if(i === 0) gs = gs.filter(x => x.ad.trim() !== ad);
+                    
+                    // Yeni taksit satırını ekleyelim
                     gs.push({ad: ta, tu: tu, gu: gu, od: false, taksitId: yeniTaksitGrupId});
+                    
+                    // Diğer gelir ve giderleri ASLA silmeden veritabanına geri yazalım
                     await dbSet(dk, {giderler: gs, gelirler: gl});
                 }
-                alert(`İşlem ${n} aya planlandı.`); setTimeout(verileriCek, 1200);
+                
+                alert(`İşlem ${n} aya başarıyla planlandı.`); 
+                // Ekranı temizce güncelle
+                setTimeout(verileriCek, 500);
             }
         }
-
         function satirlariRenklendir() {
             const bugunTS = new Date(); const bugunGun = bugunTS.getDate();
             const aktifYil = parseInt(document.getElementById('y-sel').value); const aktifAy = parseInt(document.getElementById('m-sel').value);
