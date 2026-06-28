@@ -320,3 +320,231 @@
                 r.remove(); await verileriKaydet();
                 for(let i=1; i<=36; i++) {
                     let m = sm + i, y = sy; if(m > 11) { y += Math.floor(m/12); m = m%12; }
+                    const dk = `${y}_${m}`; const d = await dbGet(dk);
+                    if(d && d.giderler) {
+                        let yeniGiderler = d.giderler.filter(x => x.taksitId !== tId);
+                        await dbSet(dk, {giderler: yeniGiderler, gelatinler: [], gelirler: d.gelirler || []});
+                    }
+                }
+                alert("Taksit grubu gelecek aylardan temizlendi."); setTimeout(verileriCek, 1000);
+            } else { r.remove(); verileriKaydet(); }
+        }
+
+        function tumGiderleriSil() {
+            if(confirm("Bu ayki TÜM GİDERLERİ tek seferde silmek istediğinize emin misiniz?")) {
+                hafizayaKaydet(); document.getElementById('g-list').innerHTML = ""; verileriKaydet();
+            }
+        }
+
+        async function gecenAyiKopyala() {
+            if(!confirm("Geçen ayın sabit bütçesini kopyalamak istiyor musunuz?")) return;
+            let m = parseInt(document.getElementById('m-sel').value); let y = parseInt(document.getElementById('y-sel').value);
+            if(m === 0) { m = 11; y--; } else { m--; }
+            const d = await dbGet(y + "_" + m);
+            if(d) {
+                hafizayaKaydet(); const taksitRegex = /\(\d+\/\d+\)$/;
+                if(d.giderler) {
+                    d.giderler.forEach(x => {
+                        if(!taksitRegex.test(x.ad.trim())) satirBas('gider', {...x, od: false, taksitId: ""});
+                    });
+                }
+                const eskiGelirler = d.gelirler || d.gelatinler || [];
+                if(eskiGelirler) eskiGelirler.forEach(x => satirBas('gelir', x));
+                await verileriKaydet(); alert("Aktarım tamamlandı!");
+            }
+        }
+
+        async function taksitlendirButonlu(id) {
+            const r = document.getElementById(id); 
+            const ad = r.querySelector('.in-ad').value.trim();
+            const tu = r.querySelector('.in-tu').value.trim(); 
+            const gu = r.querySelector('.in-gu').value.trim();
+            
+            if(!ad || !tu) { alert("Açıklama ve Tutar girmelisiniz!"); return; }
+            
+            const n = parseInt(prompt(`"${ad}" harcamasını kaç taksit yapmak istersiniz?`)); 
+            if(isNaN(n) || n <= 1) return;
+            
+            isTaksitIslemiYapiliyor = true; 
+            const yeniTaksitGrupId = "tks_" + Date.now(); 
+            
+            const sy = document.getElementById('y-sel').value; 
+            const sm = document.getElementById('m-sel').value;
+            
+            // Ekranda açık olan mevcut verileri güvenli oku
+            const gids = [], gels = [];
+            document.querySelectorAll('#g-list .row-item').forEach(row => {
+                if(row.id === id) return;
+                const rowAd = row.querySelector('.in-ad').value; const rowTu = row.querySelector('.in-tu').value;
+                if(rowAd || rowTu) gids.push({ad: rowAd, tu: rowTu, gu: row.querySelector('.in-gu').value, od: row.querySelector('.in-od').checked, taksitId: row.dataset.taksitId || ""});
+            });
+            document.querySelectorAll('#gel-list .row-item').forEach(row => {
+                const rowAd = row.querySelector('.in-ad').value; const rowTu = row.querySelector('.in-tu').value;
+                if(rowAd || rowTu) gels.push({ad: rowAd, tu: rowTu});
+            });
+
+            // Eşzamanlı Supabase istek kuyruğu oluşturuyoruz (Kilitlenmeyi önler)
+            const promises = [];
+
+            for(let i=0; i<n; i++) {
+                let m = parseInt(sm) + i; 
+                let y = parseInt(sy); 
+                if(m > 11) { y += Math.floor(m / 12); m = m % 12; }
+                
+                const dk = `${y}_${m}`; 
+                const ta = `${ad} (${i+1}/${n})`;
+                
+                if (i === 0) {
+                    gids.push({ad: ta, tu: tu, gu: gu, od: false, taksitId: yeniTaksitGrupId});
+                    promises.push(dbSet(dk, {giderler: gids, gelirler: gels}));
+                } else {
+                    // Gelecek aylar için asenkron yapıyı bağımsız bir fonksiyona bağlayıp kuyruğa atıyoruz
+                    const f = async (donemAnahtari, taksitBasligi) => {
+                        const docData = await dbGet(donemAnahtari);
+                        let gs = docData && docData.giderler ? docData.giderler : []; 
+                        let gl = docData && (docData.gelirler || docData.gelatinler) ? (docData.gelirler || docData.gelatinler) : [];
+                        gs.push({ad: taksitBasligi, tu: tu, gu: gu, od: false, taksitId: yeniTaksitGrupId});
+                        await dbSet(donemAnahtari, {giderler: gs, gelirler: gl});
+                    };
+                    promises.push(f(dk, ta));
+                }
+            }
+            
+            try {
+                // Tüm ayları tek bir pakette kaydet
+                await Promise.all(promises);
+                r.remove();
+                alert(`Taksit işlemi başarıyla tamamlandı. ${n} aya dağıtıldı.`); 
+            } catch (err) {
+                console.error(err);
+                alert("Veritabanı kaydı sırasında bir hata oluştu!");
+            } finally {
+                isTaksitIslemiYapiliyor = false; 
+                await verileriCek(); 
+                await yillikRaporHesapla();
+            }
+        }
+
+        function satirlariRenklendir() {
+            const bugunTS = new Date(); const bugunGun = bugunTS.getDate();
+            const aktifYil = parseInt(document.getElementById('y-sel').value); const aktifAy = parseInt(document.getElementById('m-sel').value);
+            document.querySelectorAll('#g-list .row-item').forEach(r => {
+                const isChecked = r.querySelector('.in-od').checked; const girilenGun = parseInt(r.querySelector('.in-gu').value) || 0;
+                if (isChecked) { r.style.backgroundColor = "var(--row-success)"; return; }
+                if (girilenGun <= 0) { r.style.backgroundColor = "transparent"; return; }
+                if (aktifYil === bugunTS.getFullYear() && aktifAy === bugunTS.getMonth()) {
+                    if (bugunGun > girilenGun) r.style.backgroundColor = "var(--row-danger)";
+                    else if (girilenGun - bugunGun <= 3) r.style.backgroundColor = "var(--row-warning)";
+                    else r.style.backgroundColor = "transparent";
+                } else if (aktifYil < bugunTS.getFullYear() || (aktifYil === bugunTS.getFullYear() && aktifAy < bugunTS.getMonth())) {
+                    r.style.backgroundColor = "var(--row-danger)";
+                } else { r.style.backgroundColor = "transparent"; }
+            });
+        }
+
+        async function yillikRaporHesapla() {
+            if(!aktifId) return;
+            const raporYili = document.getElementById('yillik-y-sel').value;
+            const container = document.getElementById('yillik-rapor-listesi');
+            container.innerHTML = ""; 
+
+            for(let m=0; m<12; m++) {
+                let tGel = 0, tGid = 0;
+                const data = await dbGet(raporYili + "_" + m);
+                if (data) {
+                    const gList = data.gelirler || data.gelatinler || [];
+                    gList.forEach(x => tGel += parseFloat(x.tu) || 0);
+                    if(data.giderler) data.giderler.forEach(x => tGid += parseFloat(x.tu) || 0);
+                }
+                const netDenge = tGel - tGid;
+                let dengeRenk = netDenge >= 0 ? "var(--success)" : "var(--danger)";
+                const kartHtml = `
+                    <div class="aylik-kart">
+                        <div class="aylik-kart-baslik"><span>📅 ${aylarIsimleri[m]}</span><span style="color:${dengeRenk}">${netDenge.toLocaleString('tr-TR')} TL</span></div>
+                        <div style="font-size:12px; color:var(--text-muted);">
+                            Gelir: <span style="color:var(--success)">${tGel.toLocaleString('tr-TR')}</span> | Gider: <span style="color:var(--danger)">${tGid.toLocaleString('tr-TR')}</span>
+                        </div>
+                    </div>`;
+                container.insertAdjacentHTML('beforeend', kartHtml);
+            }
+        }
+
+        function aiMesajBas(metin, kim) {
+            const box = document.getElementById('ai-chat-box');
+            const div = document.createElement('div'); div.className = `msg ${kim}`; div.innerHTML = metin;
+            box.appendChild(div); box.scrollTop = box.scrollHeight;
+        }
+
+        async function aiMesajGonder() {
+            const inp = document.getElementById('ai-user-input'); const txt = inp.value.trim(); if(!txt) return;
+            aiMesajBas(txt, 'user'); inp.value = "";
+            const box = document.getElementById('ai-chat-box');
+            const loadingDiv = document.createElement('div'); loadingDiv.className = "msg ai"; loadingDiv.innerText = "Yapay zeka planlıyor... 🧠";
+            box.appendChild(loadingDiv); box.scrollTop = box.scrollHeight;
+            const aktifYil = document.getElementById('yillik-y-sel').value;
+
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: `Sen kullanıcının bütçe asistanısın. Kullanıcının adı Volkan. Sadece JSON array dön.\nKomut: "${txt}"` }] }],
+                        generationConfig: { responseMimeType: "application/json" }
+                    })
+                });
+                const resData = await response.json(); loadingDiv.remove();
+                const talimatlar = JSON.parse(resData.candidates[0].content.parts[0].text);
+                for (const t of talimatlar) {
+                    const dk = `${aktifYil}_${t.ay}`; const mevcutVeri = await dbGet(dk) || { giderler: [], gelirler: [] };
+                    if(t.islem === "ekle") {
+                        if(t.tip === "gider") { if(!mevcutVeri.giderler) mevcutVeri.giderler = []; mevcutVeri.giderler.push({ ad: t.ad, tu: t.tu.toString(), gu: (t.gu || "").toString(), od: false, taksitId: "" }); }
+                        else { if(!mevcutVeri.gelirler) mevcutVeri.gelirler = []; mevcutVeri.gelirler.push({ ad: t.ad, tu: t.tu.toString() }); }
+                    }
+                    await dbSet(dk, mevcutVeri);
+                }
+                aiMesajBas(`✅ İşlem tamamlandı Volkan, listeler güncellendi.`, 'ai');
+                await verileriCek(); await yillikRaporHesapla();
+            } catch (err) { if(loadingDiv) loadingDiv.remove(); aiMesajBas("Komut işlenirken hata oluştu.", "ai"); }
+        }
+    </script>
+</head>
+<body>
+
+    <div class="container">
+        <div id="login-screen" class="screen-panel">
+            <h2 id="log-title">Bütçe Giriş</h2>
+            <div class="input-group">
+                <label>E-posta</label>
+                <input type="email" id="log-email" class="form-input" placeholder="ornek@mail.com">
+            </div>
+            <div class="input-group">
+                <label>Şifre</label>
+                <input type="password" id="log-pass" class="form-input" placeholder="******" onkeydown="if(event.key === 'Enter') authHareketi()">
+            </div>
+            <button id="log-main-btn" class="btn-block" onclick="authHareketi()">GİRİŞ YAP</button>
+            <div style="text-align: center; margin-top: 15px;">
+                <span id="log-toggle-link" class="link-btn" onclick="modDegis()">Yeni Hesap Oluştur</span>
+                <br>
+                <span class="link-btn" onclick="sifreHatirlat()" style="color:var(--text-muted);">Şifremi Unuttum</span>
+            </div>
+        </div>
+
+        <div id="app-content" style="display: none;">
+            <div class="header-bar">
+                <div>Aktif Kullanıcı: <strong id="user-display" style="color:var(--primary);">-</strong></div>
+                <button onclick="window.location.reload()">Güvenli Çıkış</button>
+            </div>
+
+            <div class="controls-row">
+                <select id="m-sel" onchange="verileriCek()"></select>
+                <select id="y-sel" onchange="verileriCek()"></select>
+                <button class="btn-action" onclick="gecenAyiKopyala()">Önceki Ayı Kopyala</button>
+                <button class="btn-action" onclick="geriAl()">↩ Adımı Geri Al</button>
+                <button class="btn-action btn-danger-action" onclick="tumGiderleriSil()">Giderleri Temizle</button>
+            </div>
+
+            <div class="summary-grid">
+                <div class="summary-card"><div class="title">Toplam Gelir</div><div id="res-tgel" style="color:var(--success);">0 TL</div></div>
+                <div class="summary-card"><div class="title">Toplam Gider</div><div id="res-tg" style="color:var(--danger);">0 TL</div></div>
+                <div class="summary-card"><div class="title">Ödenecek Kalan</div><div id="res-kalan" style="color:var(--warning);">0 TL</div></div>
+                <div class="summary-card"><div class="title">Net Durum</div><div id="
