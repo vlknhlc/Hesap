@@ -374,92 +374,60 @@
    
 // ... diğer kodlar aynı ...
 
-async function taksitlendirButonlu(id) {
-    const r = document.getElementById(id);
-    const ad = r.querySelector('.in-ad').value.trim();
-    const tu = r.querySelector('.in-tu').value.trim();
-    const gu = r.querySelector('.in-gu').value.trim();
+function taksitlendirButonlu(id) {
+        const r = document.getElementById(id);
+        const ad = r.querySelector('.in-ad').value.trim();
+        const tu = r.querySelector('.in-tu').value.trim();
+        const gu = r.querySelector('.in-gu').value.trim();
 
-    if (!ad || !tu) {
-        alert("⚠️ Lütfen önce harcamanın Açıklama ve Tutar alanlarını doldurun!");
-        return;
-    }
-    if (ad.includes('/') || /\(\d+\/\d+\)$/.test(ad)) {
-        alert("⚠️ Bu harcama zaten taksitlendirilmiş görünüyor!");
-        return;
-    }
+        if(!ad || !tu) {
+            alert("⚠️ Lütfen önce harcamanın Açıklama ve Tutar alanlarını doldurun!");
+            return;
+        }
 
-    if (!confirm(`"${ad}" harcamasını taksitlendirmek istiyor musunuz?`)) return;
+        if(ad.includes('/') || /\(\d+\/\d+\)$/.test(ad)) {
+            alert("⚠️ Bu harcama zaten taksitlendirilmiş görünüyor!");
+            return;
+        }
 
-    const n = parseInt(prompt("Kaç taksit yapmak istersiniz? (2-36)"));
-    if (isNaN(n) || n <= 1 || n > 36) {
-        alert("Geçerli bir taksit sayısı girin (2-36 arası).");
-        return;
-    }
-
-    isTaksitIslemiYapiliyor = true;
-    hafizayaKaydet();
-
-    const yeniTaksitGrupId = "tks_" + Date.now();
-    const sy = parseInt(document.getElementById('y-sel').value);
-    const sm = parseInt(document.getElementById('m-sel').value);
-
-    // Orijinal satırı DOM'dan kaldır (sadece ilk ay için)
-    r.remove();
-
-    try {
-        for (let i = 0; i < n; i++) {
-            let m = sm + i;
-            let y = sy;
-            if (m > 11) {
-                y += Math.floor(m / 12);
-                m = m % 12;
+        if(confirm(`"${ad}" isimli, ${tu} TL tutarındaki harcamayı taksitlendirmek istiyor musunuz?`)) {
+            const n = parseInt(prompt("Kaç taksit yapmak istersiniz? (Örn: 3, 6, 12)"));
+            if(isNaN(n) || n <= 1) {
+                alert("Geçersiz taksit sayısı girdiniz.");
+                return;
             }
 
-            const dk = `${y}_${m}`;
-            const ta = `${ad} (${i + 1}/${n})`;
+            hafizayaKaydet();
+            const yeniTaksitGrupId = "tks_" + Date.now() + "_" + Math.random().toString(36).substr(2,4);
+            r.remove();
 
-            // Mevcut veriyi al
-            let docData = await dbGet(dk) || { giderler: [], gelirler: [] };
+            const sy = document.getElementById('y-sel').value, sm = document.getElementById('m-sel').value;
 
-            let gs = Array.isArray(docData.giderler) ? docData.giderler : [];
-            let gl = docData.gelirler || docData.gelatinler || [];
+            for(let i=0; i<n; i++) {
+                let m = parseInt(sm)+i, y = parseInt(sy); 
+                if(m>11) { y += Math.floor(m/12); m = m%12; }
+                const dk = `${y}_${m}`, ta = `${ad} (${i+1}/${n})`;
+                
+                db.collection("kullanici_verileri").doc(aktifId).collection("donemler").doc(dk).get().then(doc => {
+                    let gs = doc.exists ? (doc.data().giderler || []) : [];
+                    let gl = doc.exists ? (doc.data().gelirler || doc.data().gelatinler || []) : [];
+                    
+                    if(i === 0) {
+                        gs = gs.filter(x => x.ad.trim() !== ad);
+                    }
 
-            // İlk ayda orijinal (taksitsiz) kaydı temizle
-            if (i === 0) {
-                gs = gs.filter(x => x.ad.trim() !== ad);
-            }
-
-            // Aynı taksit satırı yoksa ekle (tekrar eklemeyi önler)
-            if (!gs.some(x => x.ad === ta)) {
-                gs.push({
-                    ad: ta,
-                    tu: tu,
-                    gu: gu,
-                    od: false,
-                    taksitId: yeniTaksitGrupId
+                    if(!gs.some(x => x.ad === ta)) {
+                        gs.push({ad: ta, tu: tu, gu: gu, od: false, taksitId: yeniTaksitGrupId});
+                        db.collection("kullanici_verileri").doc(aktifId).collection("donemler").doc(dk).set({giderler: gs, gelirler: gl, gelatinler: gl});
+                    }
                 });
             }
 
-            // Temiz veriyle kaydet
-            await dbSet(dk, {
-                giderler: gs,
-                gelirler: gl
-            });
+            alert(`Başarılı! Taksit grubu oluşturuldu ve ${n} aya işlendi.`);
+            setTimeout(verileriCek, 1200);
         }
-
-        alert(`✅ "${ad}" harcaması ${n} taksite bölündü ve ilgili aylara eklendi.`);
-        
-    } catch (error) {
-        console.error("Taksitlendirme hatası:", error);
-        alert("Taksitlendirme sırasında bir hata oluştu.");
-    } finally {
-        isTaksitIslemiYapiliyor = false;
-        // Ekranı yenile
-        await verileriCek();
-        await yillikRaporHesapla();
     }
-}
+
 
 // ... diğer fonksiyonlar ...
 
