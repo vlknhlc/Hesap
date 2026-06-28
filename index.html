@@ -3,87 +3,91 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Bütçe Takip Sistemiv1</title>
+<title>Bütçe Takip Sistemiv2</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-/* Stil kısmı aynı (kısaltıldı) */
-:root{--bg-color:#0f172a;--panel-bg:#1e293b;--border-color:#334155;--text-color:#f8fafc;--primary:#38bdf8}
-* {box-sizing:border-box;margin:0;padding:0}
-body {font-family:system-ui;background:var(--bg-color);color:var(--text-color);padding:20px}
-.container {max-width:1200px;margin:0 auto}
-.row-item {display:flex;gap:8px;margin-bottom:8px;padding:6px;border-radius:8px;background:rgba(15,23,42,0.4)}
-.table-input {width:100%;padding:10px;background:#0f172a;border:1px solid #334155;border-radius:6px;color:white}
+:root {
+--bg-color: #0f172a;
+--panel-bg: #1e293b;
+--border-color: #334155;
+--text-color: #f8fafc;
+--text-muted: #94a3b8;
+--primary: #38bdf8;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: system-ui; background: var(--bg-color); color: var(--text-color); padding: 20px; }
+.container { max-width: 1200px; margin: 0 auto; }
+.row-item { display: flex; gap: 10px; padding: 8px; background: #1e293b; margin-bottom: 8px; border-radius: 8px; }
+.table-input { padding: 8px; background: #0f172a; border: 1px solid #334155; color: white; border-radius: 6px; }
 </style>
 <script>
-const currentSupabase = window.supabase.createClient("https://itmjtoevsxvpzphnxauc.supabase.co","eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml0bWp0b2V2c3h2cHpwaG54YXVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0OTA1NDYsImV4cCI6MjA5ODA2NjU0Nn0.MBvdsBKeQgoNZbAf5hFaJ957EN_nb-Zj3D17ySSdLkw");
+const supabase = window.supabase.createClient(
+  "https://itmjtoevsxvpzphnxauc.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml0bWp0b2V2c3h2cHpwaG54YXVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0OTA1NDYsImV4cCI6MjA5ODA2NjU0Nn0.MBvdsBKeQgoNZbAf5hFaJ957EN_nb-Zj3D17ySSdLkw"
+);
 
-let aktifId = "";
+let aktifId = "test-user"; // Test için
 let isTaksitIslemiYapiliyor = false;
 
 async function dbSet(donem, veri) {
-  if(!aktifId) return;
-  const temiz = { giderler: Array.isArray(veri?.giderler)?veri.giderler:[], gelirler: Array.isArray(veri?.gelirler)?veri.gelirler:[] };
-  await currentSupabase.from('donemler').upsert({user_id:aktifId, donem, veriler:temiz}, {onConflict:'user_id,donem'});
+  await supabase.from('donemler').upsert({ user_id: aktifId, donem, veriler: veri });
 }
 
 async function dbGet(donem) {
-  if(!aktifId) return null;
-  const {data} = await currentSupabase.from('donemler').select('veriler').eq('user_id',aktifId).eq('donem',donem).maybeSingle();
-  return data?.veriler || null;
+  const { data } = await supabase.from('donemler').select('veriler').eq('user_id', aktifId).eq('donem', donem).maybeSingle();
+  return data?.veriler;
 }
 
 async function verileriCek() {
-  if(isTaksitIslemiYapiliyor) return;
   const donem = document.getElementById('y-sel').value + "_" + document.getElementById('m-sel').value;
   const data = await dbGet(donem);
   document.getElementById('g-list').innerHTML = "";
-  if(data && data.giderler) {
-    data.giderler.forEach(x => satirBas('gider', x));
+  if (data && data.giderler) {
+    data.giderler.forEach(g => satirBas(g));
   }
 }
 
-function satirBas(tip, v) {
-  const id = "r" + Math.random().toString(36).substr(2,8);
-  if(tip==='gider'){
-    const html = `<div class="row-item" id="${id}" data-taksit-id="${v.taksitId||''}">
-      <div class="cell"><input class="table-input in-ad" value="${v.ad||''}"></div>
-      <div class="cell"><input class="table-input in-tu" value="${v.tu||''}"></div>
-      <div class="cell"><input class="table-input in-gu" value="${v.gu||''}"></div>
-      <div><button onclick="taksitlendirButonlu('${id}')">🗓️</button></div>
-    </div>`;
-    document.getElementById('g-list').insertAdjacentHTML('beforeend', html);
-  }
+function satirBas(g) {
+  const id = "r" + Math.random().toString(36).slice(2);
+  const html = `<div class="row-item" id="${id}" data-taksit-id="${g.taksitId||''}">
+    <input class="table-input" value="${g.ad}" style="flex:3">
+    <input class="table-input" value="${g.tu}" type="number">
+    <button onclick="taksitlendirButonlu('${id}')">Taksitlendir</button>
+  </div>`;
+  document.getElementById('g-list').insertAdjacentHTML('beforeend', html);
 }
 
 async function taksitlendirButonlu(id) {
-  const r = document.getElementById(id);
-  const ad = r.querySelector('.in-ad').value.trim();
-  const tu = r.querySelector('.in-tu').value.trim();
-  if(!ad || !tu) return alert("Bilgileri doldurun");
+  const row = document.getElementById(id);
+  const ad = row.querySelector('input').value.trim();
+  const tu = row.querySelectorAll('input')[1].value;
 
   const n = parseInt(prompt("Kaç taksit?"));
-  if(!n || n<2) return;
+  if (!n || n < 2) return;
 
   isTaksitIslemiYapiliyor = true;
-  const grupId = "tks_"+Date.now();
+  const grup = "t" + Date.now();
+
   const y = parseInt(document.getElementById('y-sel').value);
   const m = parseInt(document.getElementById('m-sel').value);
 
-  r.remove();
-
-  for(let i=0; i<n; i++){
+  for (let i = 0; i < n; i++) {
     let ay = m + i;
     let yil = y;
-    if(ay>11){ yil += Math.floor(ay/12); ay %=12; }
-    const dk = `${yil}_${ay}`;
-    const isim = `${ad} (${i+1}/${n})`;
+    if (ay > 11) { yil += Math.floor(ay/12); ay %= 12; }
+    const donem = `${yil}_${ay}`;
 
-    const mevcut = await dbGet(dk) || {giderler:[]};
-    let giderler = mevcut.giderler.filter(x => x.ad !== ad);
-    if(!giderler.some(x=>x.ad===isim)){
-      giderler.push({ad:isim, tu, gu:"1", od:false, taksitId:grupId});
-    }
-    await dbSet(dk, {giderler});
+    let data = await dbGet(donem) || {giderler: []};
+    data.giderler = data.giderler.filter(x => x.ad !== ad);
+
+    data.giderler.push({
+      ad: `${ad} (${i+1}/${n})`,
+      tu: tu,
+      gu: "1",
+      taksitId: grup
+    });
+
+    await dbSet(donem, data);
   }
 
   isTaksitIslemiYapiliyor = false;
@@ -91,12 +95,10 @@ async function taksitlendirButonlu(id) {
   alert("Taksitler eklendi!");
 }
 
-// Başlangıç
 window.onload = () => {
-  // Ay seçici doldur...
   document.getElementById('m-sel').value = new Date().getMonth();
   document.getElementById('y-sel').value = new Date().getFullYear();
-  // Giriş sonrası verileriCek() çağır
+  verileriCek();
 };
 </script>
 </head>
@@ -105,7 +107,7 @@ window.onload = () => {
   <select id="m-sel" onchange="verileriCek()"></select>
   <select id="y-sel" onchange="verileriCek()"></select>
   <div id="g-list"></div>
-  <button onclick="satirEkle('gider')">+ Gider Ekle</button>
+  <button onclick="satirEkle()">+ Yeni Gider</button>
 </div>
 </body>
 </html>
