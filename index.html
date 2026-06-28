@@ -163,15 +163,23 @@
         };
 
         async function dbSet(donem, veri) {
-            if(!aktifId) return;
-            // Geliştirilmiş temizlik filtresi: Gelen veri yapısı bozuk veya tanımsız olsa bile hata üretmez
-            const temizVeri = {
-                giderler: (veri && veri.giderler) ? veri.giderler : [],
-                gelirler: (veri && veri.gelirler) ? veri.gelirler : []
-            };
-            await currentSupabase.from('donemler').upsert({ user_id: aktifId, donem: donem, veriler: temizVeri }, { onConflict: 'user_id,donem' });
-        }
-
+    if (!aktifId) return;
+    
+    const temizVeri = {
+        giderler: Array.isArray(veri?.giderler) ? veri.giderler : [],
+        gelirler: Array.isArray(veri?.gelirler) ? veri.gelirler : []
+    };
+    
+    await currentSupabase
+        .from('donemler')
+        .upsert({ 
+            user_id: aktifId, 
+            donem: donem, 
+            veriler: temizVeri 
+        }, { 
+            onConflict: 'user_id,donem' 
+        });
+}
         async function dbGet(donem) {
             if(!aktifId) return null;
             const { data, error } = await currentSupabase.from('donemler').select('veriler').eq('user_id', aktifId).eq('donem', donem).maybeSingle();
