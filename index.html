@@ -98,10 +98,11 @@
     </style>
 
     <script>
+        // GitHub'daki orijinal Supabase bağlantı bilgilerinizi tam olarak koruyoruz
         if (!window.supabaseClient) {
             window.supabaseClient = window.supabase.createClient(
                 "https://itmjtoevsxvpzphnxauc.supabase.co",
-                "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml0bWp0b2V2c3h2cHpwaG54YXVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0OTA1NDYsImV4cCI6MjA5ODA2NjU0Nn0.MBvdsBKeQgoNZbAf5hFaJ957EN_nb-Zj3D17ySSdLkw"
+                "sb_publishable_L7HzzWwk6-VMZN3aNDNSWQ_LToJsfjn"
             );
         }
         const currentSupabase = window.supabaseClient;
@@ -164,7 +165,6 @@
 
         async function dbSet(donem, veri) {
             if(!aktifId) return;
-            // Kayıt atarken hem gelirler yapısını standardize ediyoruz
             const temizVeri = {
                 giderler: veri.giderler || [],
                 gelirler: veri.gelirler || veri.gelatinler || []
@@ -194,7 +194,7 @@
             document.querySelectorAll('#gel-list .row-item').forEach(r => {
                 gels.push({ ad: r.querySelector('.in-ad').value, tu: r.querySelector('.in-tu').value });
             });
-            geçmişHafıza.push({ giderler: gids, gelirler: gels });
+            geçmişHafıza.push({ giderler: gids, gelatinler: gels });
             if (geçmişHafıza.length > 20) geçmişHafıza.shift();
         }
 
@@ -204,7 +204,10 @@
             document.getElementById('g-list').innerHTML = "";
             document.getElementById('gel-list').innerHTML = "";
             if(sonDurum.giderler) sonDurum.giderler.forEach(x => satirBas('gider', x));
-            if(sonDurum.gelirler) sonDurum.gelirler.forEach(x => satirBas('gelir', x));
+            if(sonDurum.gelirler || sonDurum.gelatinler) {
+                const arr = sonDurum.gelirler || sonDurum.gelatinler;
+                arr.forEach(x => satirBas('gelir', x));
+            }
             const donem = document.getElementById('y-sel').value + "_" + document.getElementById('m-sel').value;
             await dbSet(donem, sonDurum);
             hesapla();
@@ -366,16 +369,14 @@
             const n = parseInt(prompt(`"${ad}" harcamasını kaç taksit yapmak istersiniz?`)); 
             if(isNaN(n) || n <= 1) return;
             
-            // Otomatik veri kayıtlarını kilitliyoruz
             isTaksitIslemiYapiliyor = true; 
-            
             const yeniTaksitGrupId = "tks_" + Date.now(); 
             r.remove(); 
             
             const sy = document.getElementById('y-sel').value; 
             const sm = document.getElementById('m-sel').value;
             
-            // 1. ADIM: Şu anki mevcut ekran durumunu veritabanına korumalı kaydet
+            // 1. ADIM: Şu an ekranda duran verileri kaybetmemek için mevcut ayı kaydet
             const gids = [], gels = [];
             document.querySelectorAll('#g-list .row-item').forEach(row => {
                 const rowAd = row.querySelector('.in-ad').value; const rowTu = row.querySelector('.in-tu').value;
@@ -385,11 +386,9 @@
                 const rowAd = row.querySelector('.in-ad').value; const rowTu = row.querySelector('.in-tu').value;
                 if(rowAd || rowTu) gels.push({ad: rowAd, tu: rowTu});
             });
-            
-            // Mevcut ayı güncelle
             await dbSet(sy + "_" + sm, {giderler: gids, gelirler: gels});
 
-            // 2. ADIM: Gelecek tüm ayları sırayla döngüye alıp ekle
+            // 2. ADIM: Gelecek aylara taksitleri enjekte et
             for(let i=0; i<n; i++) {
                 let m = parseInt(sm) + i; 
                 let y = parseInt(sy); 
@@ -398,24 +397,20 @@
                 const dk = `${y}_${m}`; 
                 const ta = `${ad} (${i+1}/${n})`;
                 
-                // İlgili ayı çek
                 const docData = await dbGet(dk);
+                // KRİTİK DÜZELTME: Eğer ay boşsa (null) sıfır dizi oluştur, veriyi yok etme!
                 let gs = docData && docData.giderler ? docData.giderler : []; 
                 let gl = docData && (docData.gelirler || docData.gelatinler) ? (docData.gelirler || docData.gelatinler) : [];
                 
-                if(i === 0) gs = gs.filter(x => x.ad.trim() !== ad); // İlk aydaki kopyayı temizle
+                if(i === 0) gs = gs.filter(x => x.ad.trim() !== ad); 
                 
-                // Yeni taksit kaydını ekle
                 gs.push({ad: ta, tu: tu, gu: gu, od: false, taksitId: yeniTaksitGrupId});
-                
-                // Tamamen bağımsız olarak veritabanına yazdırıyoruz
                 await dbSet(dk, {giderler: gs, gelirler: gl});
             }
             
             alert(`Taksit işlemi başarıyla tamamlandı. ${n} aya dağıtıldı.`); 
             isTaksitIslemiYapiliyor = false; 
             
-            // Ekranı temizle ve verileri yeniden yükle
             await verileriCek(); 
             await yillikRaporHesapla();
         }
