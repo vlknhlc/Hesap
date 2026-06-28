@@ -8,16 +8,13 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <script>
-        // Supabase Bağlantı Kurulumu
-if (!window.supabaseClient) {
-    window.supabaseClient = window.supabase.createClient(
-        "https://itmjtoevsxvpzphnxauc.supabase.co",
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml0bWp0b2V2c3h2cHpwaG54YXVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0OTA1NDYsImV4cCI6MjA5ODA2NjU0Nn0.MBvdsBKeQgoNZbAf5hFaJ957EN_nb-Zj3D17ySSdLkw"
-    );
-}
-const currentSupabase = window.supabaseClient;
-
-    
+        // Supabase Bağlantı Kurulumu (Gerçek Anon Public Key Tanımlandı)
+        if (!window.supabaseClient) {
+            window.supabaseClient = window.supabase.createClient(
+                "https://itmjtoevsxvpzphnxauc.supabase.co",
+                "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml0bWp0b2V2c3h2cHpwaG54YXVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0OTA1NDYsImV4cCI6MjA5ODA2NjU0Nn0.MBvdsBKeQgoNZbAf5hFaJ957EN_nb-Zj3D17ySSdLkw"
+            );
+        }
         const currentSupabase = window.supabaseClient;
 
         // Gemini API Anahtarı
@@ -73,6 +70,7 @@ const currentSupabase = window.supabaseClient;
             aylarIsimleri.forEach((n,i)=>m.add(new Option(n,i)));
             for(let i=2025;i<=2030;i++) {
                 y.add(new Option(i,i));
+                y.add(new Option(i,i));
                 yy.add(new Option(i,i));
             }
             m.value = new Date().getMonth(); 
@@ -82,11 +80,10 @@ const currentSupabase = window.supabaseClient;
 
         async function dbSet(donem, veri) {
             if(!aktifId) return;
-            // Yeni Birincil Anahtar kurgusuna göre 'user_id,donem' çakışma kontrolü güvenle çalışır.
             const { error } = await currentSupabase
                 .from('donemler')
                 .upsert({ user_id: aktifId, donem: donem, veriler: veri }, { onConflict: 'user_id,donem' });
-            if(error) console.error("Veritabanı kayıt hatası (400 kontrol):", error.message);
+            if(error) console.error("Kaydedilemedi:", error.message);
         }
 
         async function dbGet(donem) {
@@ -118,7 +115,7 @@ const currentSupabase = window.supabaseClient;
                     tu: r.querySelector('.in-tu').value
                 });
             });
-            geçmişHafıza.push({ giderler: gids, gelatinler: gels });
+            geçmişHafıza.push({ giderler: gids, gelirler: gels });
             if (geçmişHafıza.length > 20) geçmişHafıza.shift();
         }
 
@@ -536,7 +533,7 @@ Kullanıcı emri: "${txt}"`;
                 <div id="res-tg" style="font-size: 18px; font-weight: bold; color: var(--danger);">0 TL</div>
             </div>
             <div style="background: white; padding: 15px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
-                <div style="font-size: 12px; color: #888;">Kalan Ödenecek (Açık)</div>
+                <div style="font-size: 12px; color: #888;">Kalan Ödenecek</div>
                 <div id="res-kalan" style="font-size: 18px; font-weight: bold; color: var(--warning);">0 TL</div>
             </div>
             <div style="background: white; padding: 15px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
@@ -555,7 +552,6 @@ Kullanıcı emri: "${txt}"`;
                 <h3>💰 Gelir Kaynakları <button onclick="satirEkle('gelir')" style="float: right;">+ Ekle</button></h3>
                 <div id="gel-list"></div>
             </div>
-
             <div style="background: white; padding: 20px; border-radius: 8px;">
                 <h3>💸 Gider Listesi <button onclick="satirEkle('gider')" style="float: right;">+ Ekle</button></h3>
                 <div id="g-list"></div>
@@ -574,7 +570,7 @@ Kullanıcı emri: "${txt}"`;
         <div style="background: white; padding: 20px; border-radius: 8px; margin-top: 30px; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
             <h3>🤖 Akıllı Yapay Zeka Danışmanı</h3>
             <div id="ai-chat-box" style="height: 200px; border: 1px solid #eee; border-radius: 6px; overflow-y: auto; padding: 10px; background: #fafafa; margin-bottom: 10px;">
-                <div class="msg ai" style="color: var(--primary); font-size: 14px; margin-bottom: 8px;">Merhaba Volkan! Bütçene toplu işlemler için emir verebilirsin.</div>
+                <div class="msg ai" style="color: var(--primary); font-size: 14px; margin-bottom: 8px;">Merhaba Volkan! Bütçene toplu ekleme veya silme emirlerini buradan verebilirsin.</div>
             </div>
             <div style="display: flex; gap: 10px;">
                 <input type="text" id="ai-user-input" style="flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px;" placeholder="Bütçe emrinizi buraya yazın..." onkeydown="if(event.key === 'Enter') aiMesajGonder()">
