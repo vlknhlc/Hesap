@@ -110,7 +110,7 @@
         let isLogMode = true;
         let aktifId = "";
         let geçmişHafıza = [];
-        let isTaksitIslemiYapiliyor = false; // Çakışmayı önleyen kritik kilit değişkeni
+        let isTaksitIslemiYapiliyor = false; 
         const aylarIsimleri = ["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
 
         function modDegis() {
@@ -164,13 +164,18 @@
 
         async function dbSet(donem, veri) {
             if(!aktifId) return;
-            await currentSupabase.from('donemler').upsert({ user_id: aktifId, donem: donem, veriler: veri }, { onConflict: 'user_id,donem' });
+            // Kayıt atarken hem gelirler yapısını standardize ediyoruz
+            const temizVeri = {
+                giderler: veri.giderler || [],
+                gelirler: veri.gelirler || veri.gelatinler || []
+            };
+            await currentSupabase.from('donemler').upsert({ user_id: aktifId, donem: donem, veriler: temizVeri }, { onConflict: 'user_id,donem' });
         }
 
         async function dbGet(donem) {
             if(!aktifId) return null;
             const { data, error } = await currentSupabase.from('donemler').select('veriler').eq('user_id', aktifId).eq('donem', donem).maybeSingle();
-            if(error || !data) return null;
+            if(error || !data || !data.veriler) return null;
             return data.veriler;
         }
 
@@ -206,7 +211,7 @@
         }
 
         async function verileriKaydet() {
-            if(!aktifId || isTaksitIslemiYapiliyor) return; // Taksit yapılırken otomatik kaydetmeyi engelle
+            if(!aktifId || isTaksitIslemiYapiliyor) return; 
             siralaArayuz();
             const donem = document.getElementById('y-sel').value + "_" + document.getElementById('m-sel').value;
             const gids = [], gels = [];
@@ -237,18 +242,20 @@
             document.getElementById('g-list').innerHTML = "";
             document.getElementById('gel-list').innerHTML = "";
             if(data) {
-                if(data.giderler) {
-                    data.giderler.sort((a,b)=>(parseInt(a.gu)||99)-(parseInt(b.gu)||99));
-                    data.giderler.forEach(x => satirBas('gider', x));
-                    if(uyari) {
-                        setTimeout(() => {
-                            const bugun = new Date().getDate();
-                            const gecenler = data.giderler.filter(x => x.gu && parseInt(x.gu) < bugun && !x.od && x.ad);
-                            if(gecenler.length > 0) alert("⚠️ ÖDEMESİ GEÇENLER:\n" + gecenler.map(x => x.ad).join(", "));
-                        }, 1000);
-                    }
+                const aktifGiderler = data.giderler || [];
+                const aktifGelirler = data.gelirler || data.gelatinler || [];
+                
+                aktifGiderler.sort((a,b)=>(parseInt(a.gu)||99)-(parseInt(b.gu)||99));
+                aktifGiderler.forEach(x => satirBas('gider', x));
+                
+                if(uyari && aktifGiderler.length > 0) {
+                    setTimeout(() => {
+                        const bugun = new Date().getDate();
+                        const gecenler = aktifGiderler.filter(x => x.gu && parseInt(x.gu) < bugun && !x.od && x.ad);
+                        if(gecenler.length > 0) alert("⚠️ ÖDEMESİ GEÇENLER:\n" + gecenler.map(x => x.ad).join(", "));
+                    }, 1000);
                 }
-                if(data.gelirler) data.gelirler.forEach(x => satirBas('gelir', x));
+                aktifGelirler.forEach(x => satirBas('gelir', x));
             }
             hesapla();
         }
@@ -317,7 +324,7 @@
                     const dk = `${y}_${m}`; const d = await dbGet(dk);
                     if(d && d.giderler) {
                         let yeniGiderler = d.giderler.filter(x => x.taksitId !== tId);
-                        await dbSet(dk, {giderler: yeniGiderler, gelatinler: d.gelirler || d.gelatinler || []});
+                        await dbSet(dk, {giderler: yeniGiderler, gelirler: d.gelirler || []});
                     }
                 }
                 alert("Taksit grubu gelecek aylardan temizlendi."); setTimeout(verileriCek, 1000);
@@ -359,16 +366,16 @@
             const n = parseInt(prompt(`"${ad}" harcamasını kaç taksit yapmak istersiniz?`)); 
             if(isNaN(n) || n <= 1) return;
             
-            // Kritik Kilit Aktif - Diğer otomatik kaydetmeler engellendi!
+            // Otomatik veri kayıtlarını kilitliyoruz
             isTaksitIslemiYapiliyor = true; 
             
             const yeniTaksitGrupId = "tks_" + Date.now(); 
-            r.remove(); // Mevcut taksit satırını DOM'dan sil
+            r.remove(); 
             
             const sy = document.getElementById('y-sel').value; 
             const sm = document.getElementById('m-sel').value;
             
-            // 1. ADIM: Mevcut açık olan ekranı önce veritabanına temizce kaydet
+            // 1. ADIM: Şu anki mevcut ekran durumunu veritabanına korumalı kaydet
             const gids = [], gels = [];
             document.querySelectorAll('#g-list .row-item').forEach(row => {
                 const rowAd = row.querySelector('.in-ad').value; const rowTu = row.querySelector('.in-tu').value;
@@ -378,9 +385,11 @@
                 const rowAd = row.querySelector('.in-ad').value; const rowTu = row.querySelector('.in-tu').value;
                 if(rowAd || rowTu) gels.push({ad: rowAd, tu: rowTu});
             });
+            
+            // Mevcut ayı güncelle
             await dbSet(sy + "_" + sm, {giderler: gids, gelirler: gels});
 
-            // 2. ADIM: Gelecek aylara taksitleri koruyarak ekle
+            // 2. ADIM: Gelecek tüm ayları sırayla döngüye alıp ekle
             for(let i=0; i<n; i++) {
                 let m = parseInt(sm) + i; 
                 let y = parseInt(sy); 
@@ -389,18 +398,24 @@
                 const dk = `${y}_${m}`; 
                 const ta = `${ad} (${i+1}/${n})`;
                 
+                // İlgili ayı çek
                 const docData = await dbGet(dk);
                 let gs = docData && docData.giderler ? docData.giderler : []; 
                 let gl = docData && (docData.gelirler || docData.gelatinler) ? (docData.gelirler || docData.gelatinler) : [];
                 
-                if(i === 0) gs = gs.filter(x => x.ad.trim() !== ad); // İlk aydaki ana kopyayı temizle
+                if(i === 0) gs = gs.filter(x => x.ad.trim() !== ad); // İlk aydaki kopyayı temizle
                 
+                // Yeni taksit kaydını ekle
                 gs.push({ad: ta, tu: tu, gu: gu, od: false, taksitId: yeniTaksitGrupId});
+                
+                // Tamamen bağımsız olarak veritabanına yazdırıyoruz
                 await dbSet(dk, {giderler: gs, gelirler: gl});
             }
             
             alert(`Taksit işlemi başarıyla tamamlandı. ${n} aya dağıtıldı.`); 
-            isTaksitIslemiYapiliyor = false; // Kilidi kaldır
+            isTaksitIslemiYapiliyor = false; 
+            
+            // Ekranı temizle ve verileri yeniden yükle
             await verileriCek(); 
             await yillikRaporHesapla();
         }
@@ -558,7 +573,7 @@
             <div class="table-panel" style="margin-top: 20px; border-color: rgba(56, 189, 248, 0.3);">
                 <h3 style="color:var(--primary); margin-bottom:10px;">🤖 Akıllı Yapay Zeka Asistanı</h3>
                 <div id="ai-chat-box" class="chat-box">
-                    <div class="msg ai">Selam Volkan! Toplu bütçe işlemlerini tek komutla buraya yazarak bana yaptırabilirsin.</div>
+                    <div class="msg ai">Selam! Toplu bütçe işlemlerini tek komutla buraya yazarak bana yaptırabilirsin.</div>
                 </div>
                 <div style="display: flex; gap: 8px;">
                     <input type="text" id="ai-user-input" class="form-input" style="padding:10px;" placeholder="Örn: Her aya 2500 TL Aidat ekle..." onkeydown="if(event.key === 'Enter') aiMesajGonder()">
