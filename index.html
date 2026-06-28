@@ -371,78 +371,98 @@
             }
         }
 
-   async function taksitlendirButonlu(id) {
-    const r = document.getElementById(id); 
-    const ad = r.querySelector('.in-ad').value.trim();
-    const tu = r.querySelector('.in-tu').value.trim(); 
-    const gu = r.querySelector('.in-gu').value.trim();
-    
-    if(!ad || !tu) { alert("⚠️ Lütfen önce harcamanın Açıklama ve Tutar alanlarını doldurun!"); return; }
-    if(ad.includes('/') || /\(\d+\/\d+\)$/.test(ad)) { alert("⚠️ Bu harcama zaten taksitlendirilmiş görünüyor!"); return; }
-    
-    if(confirm(`"${ad}" harcamasını taksitlendirmek istiyor musunuz?`)) {
-        const n = parseInt(prompt("Kaç taksit yapmak istersiniz?")); 
-        if(isNaN(n) || n <= 1) return;
-        
-        // Diğer input tetiklenmelerini engellemek için kilitle
-        isTaksitIslemiYapiliyor = true; 
-        
-        hafizayaKaydet(); 
-        const yeniTaksitGrupId = "tks_" + Date.now(); 
-        
-        const sy = document.getElementById('y-sel').value;
-        const sm = document.getElementById('m-sel').value;
-        
-        // Blur olayı veritabanını ezmesin diye DOM'dan hemen siliyoruz
-        r.remove(); 
+   
+// ... diğer kodlar aynı ...
 
-        try {
-            for(let i = 0; i < n; i++) {
-                let m = parseInt(sm) + i;
-                let y = parseInt(sy); 
-                if(m > 11) { y += Math.floor(m / 12); m = m % 12; }
-                
-                const dk = `${y}_${m}`; 
-                const ta = `${ad} (${i+1}/${n})`;
-                
-                // İlgili ayın verisini çek
-                const docData = await dbGet(dk);
-                
-                let gs = docData && docData.giderler ? docData.giderler : []; 
-                // Eski koddaki tüm gelir varyasyonlarını güvenle yakala
-                let gl = docData && (docData.gelirler || docData.gelatinler || docData.gelir) ? (docData.gelirler || docData.gelatinler || docData.gelir) : [];
-                
-                // İlk ayda asıl eklediğimiz taksitsiz ham harcamayı temizle
-                if(i === 0) {
-                    gs = gs.filter(x => x.ad.trim() !== ad);
-                }
-                
-                // Eğer bu taksit o aya daha önce eklenmediyse push'la
-                if(!gs.some(x => x.ad === ta)) {
-                    gs.push({ad: ta, tu: tu, gu: gu, od: false, taksitId: yeniTaksitGrupId});
-                    
-                    // KRİTİK DÜZELTME: Eski kodundaki gibi hem gelirler hem gelatinler anahtarını aynı anda yazıyoruz!
-                    await dbSet(dk, {
-                        giderler: gs, 
-                        gelirler: gl,
-                        gelatinler: gl
-                    });
-                }
+async function taksitlendirButonlu(id) {
+    const r = document.getElementById(id);
+    const ad = r.querySelector('.in-ad').value.trim();
+    const tu = r.querySelector('.in-tu').value.trim();
+    const gu = r.querySelector('.in-gu').value.trim();
+
+    if (!ad || !tu) {
+        alert("⚠️ Lütfen önce harcamanın Açıklama ve Tutar alanlarını doldurun!");
+        return;
+    }
+    if (ad.includes('/') || /\(\d+\/\d+\)$/.test(ad)) {
+        alert("⚠️ Bu harcama zaten taksitlendirilmiş görünüyor!");
+        return;
+    }
+
+    if (!confirm(`"${ad}" harcamasını taksitlendirmek istiyor musunuz?`)) return;
+
+    const n = parseInt(prompt("Kaç taksit yapmak istersiniz? (2-36)"));
+    if (isNaN(n) || n <= 1 || n > 36) {
+        alert("Geçerli bir taksit sayısı girin (2-36 arası).");
+        return;
+    }
+
+    isTaksitIslemiYapiliyor = true;
+    hafizayaKaydet();
+
+    const yeniTaksitGrupId = "tks_" + Date.now();
+    const sy = parseInt(document.getElementById('y-sel').value);
+    const sm = parseInt(document.getElementById('m-sel').value);
+
+    // Orijinal satırı DOM'dan kaldır (sadece ilk ay için)
+    r.remove();
+
+    try {
+        for (let i = 0; i < n; i++) {
+            let m = sm + i;
+            let y = sy;
+            if (m > 11) {
+                y += Math.floor(m / 12);
+                m = m % 12;
             }
-            
-            isTaksitIslemiYapiliyor = false; 
-            alert(`✅ Taksit grubu başarıyla oluşturuldu ve ${n} aya işlendi.`);
-            
-        } catch (error) {
-            console.error("Taksitlendirme sırasında hata:", error);
-            isTaksitIslemiYapiliyor = false;
+
+            const dk = `${y}_${m}`;
+            const ta = `${ad} (${i + 1}/${n})`;
+
+            // Mevcut veriyi al
+            let docData = await dbGet(dk) || { giderler: [], gelirler: [] };
+
+            let gs = Array.isArray(docData.giderler) ? docData.giderler : [];
+            let gl = docData.gelirler || docData.gelatinler || [];
+
+            // İlk ayda orijinal (taksitsiz) kaydı temizle
+            if (i === 0) {
+                gs = gs.filter(x => x.ad.trim() !== ad);
+            }
+
+            // Aynı taksit satırı yoksa ekle (tekrar eklemeyi önler)
+            if (!gs.some(x => x.ad === ta)) {
+                gs.push({
+                    ad: ta,
+                    tu: tu,
+                    gu: gu,
+                    od: false,
+                    taksitId: yeniTaksitGrupId
+                });
+            }
+
+            // Temiz veriyle kaydet
+            await dbSet(dk, {
+                giderler: gs,
+                gelirler: gl
+            });
         }
+
+        alert(`✅ "${ad}" harcaması ${n} taksite bölündü ve ilgili aylara eklendi.`);
         
-        // Verileri çekip ekranı tazelemeye zorla
-        await verileriCek(); 
+    } catch (error) {
+        console.error("Taksitlendirme hatası:", error);
+        alert("Taksitlendirme sırasında bir hata oluştu.");
+    } finally {
+        isTaksitIslemiYapiliyor = false;
+        // Ekranı yenile
+        await verileriCek();
         await yillikRaporHesapla();
     }
 }
+
+// ... diğer fonksiyonlar ...
+
         function satirlariRenklendir() {
             const bugunTS = new Date(); const bugunGun = bugunTS.getDate();
             const aktifYil = parseInt(document.getElementById('y-sel').value); const aktifAy = parseInt(document.getElementById('m-sel').value);
