@@ -343,12 +343,13 @@ window.oncekiAyiKopyala = async () => {
   if (m < 0) { m = 11; y--; }
   const s = await getDoc(ref(`${y}_${m}`));
   if (!s.exists()) return alert('⚠️ Önceki aya ait veri yok.');
-  if (!confirm('Önceki ayın şablonu bu aya kopyalansın mı? (Bu aydaki mevcut veriler değişir)')) return;
-  const o = s.data();
-  await setDoc(ref(donem()), {
-    gelirler: o.gelirler.map(x => ({ad: x.ad, tu: x.tu, gu: x.gu})),
-    giderler: o.giderler.filter(x => !x.taksitId).map(x => ({ad: x.ad, tu: x.tu, gu: x.gu, od: false, taksitId: ''}))
-  });
+  if (!confirm('Önceki aydaki gelirler ve taksitsiz giderler bu aya eklensin mi?\n(Taksitliler zaten otomatik geliyor. Bu ayda aynı isimli kayıtlar tekrar eklenmez.)')) return;
+  const o = s.data(), mevcut = await ayGetir(donem());
+  const adi = x => (x.ad || '').trim().toLowerCase();
+  const ekle = (hedef, kaynak) => { const v = new Set(hedef.map(adi)); kaynak.forEach(x => { if (!v.has(adi(x))) hedef.push(x); }); return hedef; };
+  const gelirler = ekle(mevcut.gelirler || [], (o.gelirler || []).map(x => ({ad: x.ad, tu: x.tu, gu: x.gu})));
+  const giderler = ekle(mevcut.giderler || [], (o.giderler || []).filter(x => !x.taksitId).map(x => ({ad: x.ad, tu: x.tu, gu: x.gu, od: false, taksitId: ''})));
+  await setDoc(ref(donem()), {gelirler, giderler});
   await tumunuYukle();
   yukle();
 };
