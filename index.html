@@ -83,13 +83,6 @@ import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase
 import {getAuth,GoogleAuthProvider,signInWithPopup,onAuthStateChanged,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {initializeFirestore,persistentLocalCache,doc,getDoc,setDoc,getDocs,collection,writeBatch} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-// >>> BURAYA Firebase'den kopyaladığın ayarları yapıştır <<<
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-// Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyBqgDgit3NrMUG7O5jPZKAMA3_5nFHT-rs",
   authDomain: "hesapc-e0e3f.firebaseapp.com",
@@ -98,9 +91,6 @@ const firebaseConfig = {
   messagingSenderId: "900405397806",
   appId: "1:900405397806:web:80ef0a11f1220b6f7152bf"
 };
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
