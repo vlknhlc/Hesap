@@ -18,10 +18,18 @@ input:focus,select:focus{outline:none;border-color:#38bdf8}
 <body class="p-4 md:p-8">
 
 <!-- GİRİŞ EKRANI -->
-<div id="login" class="hidden max-w-sm mx-auto mt-24 card rounded-xl p-8 text-center">
+<div id="login" class="hidden max-w-sm mx-auto mt-16 card rounded-xl p-8 text-center">
   <h1 class="text-2xl font-bold text-sky-400 mb-2">Bütçe Takip</h1>
   <p class="text-sm text-slate-400 mb-6">Verilerin hesabına kaydedilir, her cihazdan ulaşırsın.</p>
-  <button onclick="girisYap()" class="bg-sky-600 hover:bg-sky-500 px-4 py-3 rounded-lg font-bold w-full transition">Google ile giriş yap</button>
+  <input id="l-mail" type="email" autocomplete="email" placeholder="E-posta" class="w-full p-3 rounded-lg mb-2 text-sm">
+  <input id="l-pw" type="password" autocomplete="current-password" placeholder="Şifre" class="w-full p-3 rounded-lg mb-3 text-sm">
+  <button onclick="epGiris()" class="bg-sky-600 hover:bg-sky-500 px-4 py-3 rounded-lg font-bold w-full transition">Giriş yap</button>
+  <div class="flex justify-between mt-3 text-xs">
+    <button onclick="epKayit()" class="text-sky-400">Hesap oluştur</button>
+    <button onclick="sifreSifirla()" class="text-slate-400">Şifremi unuttum</button>
+  </div>
+  <p class="my-4 text-xs text-slate-500">veya</p>
+  <button onclick="girisYap()" class="bg-slate-700 hover:bg-slate-600 px-4 py-3 rounded-lg font-semibold w-full text-sm transition">Google ile giriş yap</button>
   <p id="login-hata" class="text-rose-400 text-xs mt-4"></p>
 </div>
 
@@ -41,9 +49,12 @@ input:focus,select:focus{outline:none;border-color:#38bdf8}
       </select>
       <select id="y-sel" onchange="yukle()" class="p-2 rounded-lg font-semibold"></select>
       <button onclick="oncekiAyiKopyala()" class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-lg text-sm font-semibold transition">Önceki Ayı Kopyala</button>
+      <button onclick="sifreBelirle()" class="text-slate-400 hover:text-white text-xs px-2">🔑 Şifre belirle</button>
       <button onclick="cikisYap()" class="text-slate-400 hover:text-white text-sm px-2">Çıkış</button>
     </div>
   </div>
+
+  <div id="uyari"></div>
 
   <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
     <div class="card p-4 rounded-xl"><p class="text-xs text-slate-400 font-semibold">Toplam Gelir</p><p id="top-gelir" class="text-xl font-bold text-emerald-400">0 TL</p></div>
@@ -80,7 +91,7 @@ input:focus,select:focus{outline:none;border-color:#38bdf8}
 
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {getAuth,GoogleAuthProvider,signInWithPopup,onAuthStateChanged,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {getAuth,GoogleAuthProvider,signInWithPopup,onAuthStateChanged,signOut,createUserWithEmailAndPassword,signInWithEmailAndPassword,sendPasswordResetEmail,EmailAuthProvider,linkWithCredential} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {initializeFirestore,persistentLocalCache,doc,getDoc,setDoc,getDocs,collection,writeBatch} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -115,6 +126,39 @@ window.girisYap = async () => {
 };
 window.cikisYap = () => signOut(auth);
 
+const hataMetni = c => ({
+  'auth/invalid-credential': 'E-posta veya şifre hatalı.',
+  'auth/invalid-email': 'E-posta adresi geçersiz.',
+  'auth/missing-password': 'Şifre gir.',
+  'auth/weak-password': 'Şifre en az 6 karakter olmalı.',
+  'auth/email-already-in-use': 'Bu e-posta zaten kayıtlı. Giriş yap ya da "Şifremi unuttum"u kullan.',
+  'auth/too-many-requests': 'Çok fazla deneme. Biraz bekleyip tekrar dene.',
+  'auth/provider-already-linked': 'Bu hesapta zaten şifre var.'
+}[c] || ('Hata: ' + c));
+const girdi = () => [$('l-mail').value.trim(), $('l-pw').value];
+window.epGiris = async () => {
+  try { await signInWithEmailAndPassword(auth, ...girdi()); }
+  catch (e) { $('login-hata').textContent = hataMetni(e.code); }
+};
+window.epKayit = async () => {
+  try { await createUserWithEmailAndPassword(auth, ...girdi()); }
+  catch (e) { $('login-hata').textContent = hataMetni(e.code); }
+};
+window.sifreSifirla = async () => {
+  const m = $('l-mail').value.trim();
+  if (!m) { $('login-hata').textContent = 'Önce e-posta adresini yaz.'; return; }
+  try { await sendPasswordResetEmail(auth, m); $('login-hata').textContent = 'Şifre sıfırlama e-postası gönderildi (gelmezse spam klasörüne bak).'; }
+  catch (e) { $('login-hata').textContent = hataMetni(e.code); }
+};
+// Google ile açılmış hesaba şifre ekler: telefonda aynı verilerle e-posta+şifreyle girilir
+window.sifreBelirle = async () => {
+  const u = auth.currentUser;
+  const pw = prompt('Telefonda e-postayla girmek için şifre belirle (en az 6 karakter):');
+  if (!pw) return;
+  try { await linkWithCredential(u, EmailAuthProvider.credential(u.email, pw)); alert('✅ Şifre belirlendi. Telefonda ' + u.email + ' ve bu şifreyle giriş yapabilirsin.'); }
+  catch (e) { alert('⚠️ ' + hataMetni(e.code)); }
+};
+
 onAuthStateChanged(auth, async user => {
   uid = user ? user.uid : null;
   $('login').classList.toggle('hidden', !!user);
@@ -122,6 +166,7 @@ onAuthStateChanged(auth, async user => {
   if (user) {
     $('kullanici').textContent = user.email;
     await eskiVeriyiTasi();
+    await tumunuYukle();
     yukle();
   }
 });
@@ -149,6 +194,7 @@ window.yukle = async () => {
   $('gelir-listesi').innerHTML = ''; $('gider-listesi').innerHTML = '';
   d.gelirler.forEach(x => satirEkle('gelir-listesi', x, false));
   d.giderler.forEach(x => satirEkle('gider-listesi', x, false));
+  sirala();
   rapor();
 };
 
@@ -165,7 +211,10 @@ window.satirEkle = (hedef, o = {}, kaydet = true) => {
     ${isGider && !o.taksitId ? `<button class="bt-tk bg-sky-600 hover:bg-sky-500 px-2 py-2 rounded text-xs font-bold">Taksitlendir</button>` : ''}
     ${o.taksitId ? `<span class="bg-slate-700 text-slate-400 text-[10px] px-2 py-1 rounded font-semibold">Taksitli</span>` : ''}
     <button class="bt-sil text-rose-400 hover:text-rose-300 font-bold px-2 text-sm">✕</button>`;
-  div.querySelectorAll('input').forEach(i => i.addEventListener('change', kaydet_));
+  div.querySelectorAll('input').forEach(i => i.addEventListener('change', () => {
+    if (isGider && i.classList.contains('in-gu')) sirala();
+    kaydet_();
+  }));
   div.querySelector('.bt-sil').onclick = () => { div.remove(); kaydet_(); };
   const tk = div.querySelector('.bt-tk'); if (tk) tk.onclick = () => taksitlendir(div);
   $(hedef).appendChild(div);
@@ -182,8 +231,10 @@ function satirlariOku(listId) {
 
 async function kaydet_() {
   const dk = donem();
+  const veri = {gelirler: satirlariOku('gelir-listesi'), giderler: satirlariOku('gider-listesi')};
   rapor();
-  try { await setDoc(ref(dk), {gelirler: satirlariOku('gelir-listesi'), giderler: satirlariOku('gider-listesi')}); }
+  tum[dk] = veri; uyariCiz();
+  try { await setDoc(ref(dk), veri); }
   catch (e) { alert('⚠️ Kaydedilemedi: ' + e.message); }
 }
 
@@ -203,8 +254,50 @@ async function taksitlendir(row) {
     b.set(ref(dk), d);
   }
   try { await b.commit(); alert(`✅ ${n} aya taksit işlendi.`); } catch (e) { alert('⚠️ ' + e.message); }
+  await tumunuYukle();
   yukle();
 }
+
+// ---- Gün sırası ----
+function sirala() {
+  const L = $('gider-listesi');
+  [...L.children].map((r, i) => [r, parseInt(r.querySelector('.in-gu').value) || 999, i])
+    .sort((a, b) => a[1] - b[1] || a[2] - b[2]).forEach(x => L.appendChild(x[0]));
+}
+
+// ---- Gecikmiş ödeme uyarısı ----
+const AYLAR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+let tum = {};
+async function tumunuYukle() {
+  const snap = await getDocs(collection(db, 'users', uid, 'months'));
+  tum = {}; snap.forEach(d => tum[d.id] = d.data());
+  uyariCiz();
+}
+function uyariCiz() {
+  const n = new Date(), by = n.getFullYear(), bm = n.getMonth(), bg = n.getDate(), l = [];
+  Object.entries(tum).forEach(([k, d]) => {
+    const [y, m] = k.split('_').map(Number);
+    (d.giderler || []).forEach(x => {
+      if (x.od) return;
+      const gun = parseInt(x.gu) || 0;
+      const gecmis = y < by || (y === by && m < bm);
+      if (gecmis || (y === by && m === bm && gun && gun < bg))
+        l.push({y, m, gun, ad: x.ad, tu: parseFloat(x.tu) || 0});
+    });
+  });
+  l.sort((a, b) => a.y - b.y || a.m - b.m || a.gun - b.gun);
+  if (!l.length) { $('uyari').innerHTML = ''; return; }
+  const toplam = l.reduce((t, x) => t + x.tu, 0).toLocaleString('tr-TR');
+  $('uyari').innerHTML = `<div class="rounded-xl p-4 mb-6 border border-rose-500/60 bg-rose-950/40">
+    <p class="font-bold text-rose-300 mb-2">⚠️ ${l.length} gecikmiş ödemen var — toplam ${toplam} TL</p>
+    <ul class="text-sm space-y-1">${l.slice(0, 10).map(x => `<li><button class="text-left hover:text-sky-300" onclick="git(${x.y},${x.m})">${esc(x.ad || 'İsimsiz')} — ${x.gun ? x.gun + ' ' : ''}${AYLAR[x.m]} ${x.y} · ${x.tu.toLocaleString('tr-TR')} TL</button></li>`).join('')}</ul>
+    ${l.length > 10 ? `<p class="text-xs text-slate-400 mt-2">+${l.length - 10} ödeme daha</p>` : ''}
+    <p class="text-xs text-slate-400 mt-2">Ödediysen o ayda kutuyu işaretle, uyarı kaybolur. Satıra basarak o aya gidebilirsin.</p></div>`;
+}
+window.git = (y, m) => {
+  if (![...$('y-sel').options].some(o => +o.value === y)) $('y-sel').add(new Option(y, y));
+  $('y-sel').value = y; $('m-sel').value = m; yukle();
+};
 
 // ---- Rapor ----
 function rapor() {
@@ -231,6 +324,7 @@ window.oncekiAyiKopyala = async () => {
     gelirler: o.gelirler.map(x => ({ad: x.ad, tu: x.tu, gu: x.gu})),
     giderler: o.giderler.filter(x => !x.taksitId).map(x => ({ad: x.ad, tu: x.tu, gu: x.gu, od: false, taksitId: ''}))
   });
+  await tumunuYukle();
   yukle();
 };
 
@@ -253,7 +347,7 @@ window.yedekYukle = e => {
       if (!confirm('Yedekteki aylar hesabına yazılacak (aynı aylar üzerine yazılır). Onaylıyor musun?')) return;
       const b = writeBatch(db);
       Object.keys(v).filter(k => /^\d{4}_\d{1,2}$/.test(k)).forEach(k => b.set(ref(k), v[k]));
-      await b.commit(); alert('✅ Yedek yüklendi.'); yukle();
+      await b.commit(); alert('✅ Yedek yüklendi.'); await tumunuYukle(); yukle();
     } catch (err) { alert('⚠️ Geçersiz yedek dosyası.'); }
   };
   r.readAsText(f);
