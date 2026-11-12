@@ -1,252 +1,264 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bütçe Takip Sistemi v2026</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        body { background-color: #0f172a; color: #f8fafc; font-family: sans-serif; }
-        .card { background-color: #1e293b; border: 1px solid #334155; }
-        input, select { background-color: #334155; color: #fff; border: 1px solid #475569; }
-        input:focus, select:focus { outline: none; border-color: #38bdf8; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Bütçe Takip</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f172a">
+<link rel="apple-touch-icon" href="icon-192.png">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+body{background:#0f172a;color:#f8fafc;font-family:system-ui,sans-serif}
+.card{background:#1e293b;border:1px solid #334155}
+input,select{background:#334155;color:#fff;border:1px solid #475569}
+input:focus,select:focus{outline:none;border-color:#38bdf8}
+</style>
 </head>
 <body class="p-4 md:p-8">
 
-    <div class="max-w-4xl mx-auto">
-        <div class="card rounded-xl p-6 mb-6 flex flex-wrap items-center justify-between gap-4">
-            <div>
-                <h1 class="text-2xl font-bold text-sky-400">Bütçe Takip Sistemi</h1>
-                <p class="text-xs text-slate-400">LocalDB - Sıfır Karmaşa Sürümü</p>
-            </div>
-            <div class="flex items-center gap-2 flex-wrap">
-                <select id="m-sel" onchange="verileriYukle()" class="p-2 rounded-lg font-semibold">
-                    <option value="0">Ocak</option>
-                    <option value="1">Şubat</option>
-                    <option value="2">Mart</option>
-                    <option value="3">Nisan</option>
-                    <option value="4">Mayıs</option>
-                    <option value="5">Haziran</option>
-                    <option value="6">Temmuz</option>
-                    <option value="7">Ağustos</option>
-                    <option value="8">Eylül</option>
-                    <option value="9">Ekim</option>
-                    <option value="10">Kasım</option>
-                    <option value="11">Aralık</option>
-                </select>
-                <select id="y-sel" onchange="verileriYukle()" class="p-2 rounded-lg font-semibold">
-                    <option value="2025">2025</option>
-                    <option value="2026" selected>2026</option>
-                    <option value="2027">2027</option>
-                </select>
-                <button onclick="oncekiAyıKopyala()" class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-lg text-sm font-semibold transition">Önceki Ayı Kopyala</button>
-            </div>
-        </div>
+<!-- GİRİŞ EKRANI -->
+<div id="login" class="hidden max-w-sm mx-auto mt-24 card rounded-xl p-8 text-center">
+  <h1 class="text-2xl font-bold text-sky-400 mb-2">Bütçe Takip</h1>
+  <p class="text-sm text-slate-400 mb-6">Verilerin hesabına kaydedilir, her cihazdan ulaşırsın.</p>
+  <button onclick="girisYap()" class="bg-sky-600 hover:bg-sky-500 px-4 py-3 rounded-lg font-bold w-full transition">Google ile giriş yap</button>
+  <p id="login-hata" class="text-rose-400 text-xs mt-4"></p>
+</div>
 
-        <div class="card rounded-xl p-4 mb-6 flex flex-wrap items-center justify-between gap-4 border-dashed border-sky-500/50">
-            <div class="text-sm">
-                <span class="font-bold text-sky-400">🛡️ Veri Güvencesi:</span> Tarayıcı geçmişini silme ihtimaline karşı bütçeni bilgisayarına yedekle.
-            </div>
-            <div class="flex items-center gap-2">
-                <button onclick="yedekIndir()" class="bg-sky-600 hover:bg-sky-500 px-3 py-1.5 rounded-lg text-xs font-bold transition">📥 Tüm Verileri Yedekle</button>
-                <button onclick="document.getElementById('file-input').click()" class="bg-amber-600 hover:bg-amber-500 px-3 py-1.5 rounded-lg text-xs font-bold transition">📤 Yedeği Geri Yükle</button>
-                <input type="file" id="file-input" onchange="yedekYukle(event)" class="hidden" accept=".json">
-            </div>
-        </div>
-
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div class="card p-4 rounded-xl">
-                <p class="text-xs text-slate-400 font-semibold uppercase">Toplam Gelir</p>
-                <p id="top-gelir" class="text-xl font-bold text-emerald-400">0 TL</p>
-            </div>
-            <div class="card p-4 rounded-xl">
-                <p class="text-xs text-slate-400 font-semibold uppercase">Toplam Gider</p>
-                <p id="top-gider" class="text-xl font-bold text-rose-400">0 TL</p>
-            </div>
-            <div class="card p-4 rounded-xl">
-                <p class="text-xs text-slate-400 font-semibold uppercase">Ödenecek Kalan</p>
-                <p id="odenecek-kalan" class="text-xl font-bold text-amber-400">0 TL</p>
-            </div>
-            <div class="card p-4 rounded-xl">
-                <p class="text-xs text-slate-400 font-semibold uppercase">Net Durum</p>
-                <p id="net-durum" class="text-xl font-bold">0 TL</p>
-            </div>
-        </div>
-
-        <div class="card rounded-xl p-6 mb-6">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-lg font-bold text-emerald-400 flex items-center gap-2">💰 Aylık Gelirler</h2>
-                <button onclick="satirEkle('gelir-listesi', '', '', '')" class="bg-emerald-600 hover:bg-emerald-500 text-xs px-3 py-1.5 rounded-lg font-bold transition">+ Gelir Ekle</button>
-            </div>
-            <div id="gelir-listesi" class="space-y-2"></div>
-        </div>
-
-        <div class="card rounded-xl p-6 mb-6">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-lg font-bold text-rose-400 flex items-center gap-2">💸 Aylık Giderler</h2>
-                <button onclick="satirEkle('gider-listesi', '', '', '', false, '')" class="bg-rose-600 hover:bg-rose-500 text-xs px-3 py-1.5 rounded-lg font-bold transition">+ Gider Ekle</button>
-            </div>
-            <div id="gider-listesi" class="space-y-2"></div>
-        </div>
+<!-- UYGULAMA -->
+<div id="app" class="hidden max-w-4xl mx-auto">
+  <div class="card rounded-xl p-6 mb-6 flex flex-wrap items-center justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-bold text-sky-400">Bütçe Takip</h1>
+      <p id="kullanici" class="text-xs text-slate-400"></p>
     </div>
+    <div class="flex items-center gap-2 flex-wrap">
+      <select id="m-sel" onchange="yukle()" class="p-2 rounded-lg font-semibold">
+        <option value="0">Ocak</option><option value="1">Şubat</option><option value="2">Mart</option>
+        <option value="3">Nisan</option><option value="4">Mayıs</option><option value="5">Haziran</option>
+        <option value="6">Temmuz</option><option value="7">Ağustos</option><option value="8">Eylül</option>
+        <option value="9">Ekim</option><option value="10">Kasım</option><option value="11">Aralık</option>
+      </select>
+      <select id="y-sel" onchange="yukle()" class="p-2 rounded-lg font-semibold"></select>
+      <button onclick="oncekiAyiKopyala()" class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-lg text-sm font-semibold transition">Önceki Ayı Kopyala</button>
+      <button onclick="cikisYap()" class="text-slate-400 hover:text-white text-sm px-2">Çıkış</button>
+    </div>
+  </div>
 
-    <script>
-        window.onload = function() { verileriYukle(); };
-        defDonemKodu = () => `${document.getElementById('y-sel').value}_${document.getElementById('m-sel').value}`;
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+    <div class="card p-4 rounded-xl"><p class="text-xs text-slate-400 font-semibold">Toplam Gelir</p><p id="top-gelir" class="text-xl font-bold text-emerald-400">0 TL</p></div>
+    <div class="card p-4 rounded-xl"><p class="text-xs text-slate-400 font-semibold">Toplam Gider</p><p id="top-gider" class="text-xl font-bold text-rose-400">0 TL</p></div>
+    <div class="card p-4 rounded-xl"><p class="text-xs text-slate-400 font-semibold">Ödenecek Kalan</p><p id="odenecek-kalan" class="text-xl font-bold text-amber-400">0 TL</p></div>
+    <div class="card p-4 rounded-xl"><p class="text-xs text-slate-400 font-semibold">Net Durum</p><p id="net-durum" class="text-xl font-bold">0 TL</p></div>
+  </div>
 
-        function verileriYukle() {
-            const dk = defDonemKodu();
-            const localData = JSON.parse(localStorage.getItem(dk)) || { gelirler: [], giderler: [] };
-            document.getElementById('gelir-listesi').innerHTML = '';
-            document.getElementById('gider-listesi').innerHTML = '';
-            localData.gelirler.forEach(item => satirEkle('gelir-listesi', item.ad, item.tu, item.gu));
-            localData.giderler.forEach(item => satirEkle('gider-listesi', item.ad, item.tu, item.gu, item.od, item.taksitId));
-            raporHesapla();
-        }
+  <div class="card rounded-xl p-6 mb-6">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-lg font-bold text-emerald-400">💰 Aylık Gelirler</h2>
+      <button onclick="satirEkle('gelir-listesi')" class="bg-emerald-600 hover:bg-emerald-500 text-xs px-3 py-1.5 rounded-lg font-bold transition">+ Gelir Ekle</button>
+    </div>
+    <div id="gelir-listesi" class="space-y-2"></div>
+  </div>
 
-        function satirEkle(hedefId, ad = '', tu = '', gu = '', od = false, taksitId = '') {
-            const container = document.getElementById(hedefId);
-            const rId = "row_" + Math.random().toString(36).substr(2, 9);
-            const isGider = hedefId === 'gider-listesi';
-            const div = document.createElement('div');
-            div.id = rId;
-            div.className = "flex flex-wrap items-center gap-2 bg-slate-800 p-2 rounded-lg border border-slate-700 transition";
-            div.innerHTML = `
-                ${isGider ? `<input type="checkbox" class="in-od w-5 h-5 cursor-pointer accent-rose-500" ${od ? 'checked' : ''} onchange="hafizayaKaydet()">` : ''}
-                <input type="text" class="in-ad flex-1 p-2 rounded text-sm min-w-[150px]" placeholder="Açıklama" value="${ad}" onchange="hafizayaKaydet()">
-                <input type="number" class="in-tu w-24 p-2 rounded text-sm text-right" placeholder="Tutar" value="${tu}" onchange="hafizayaKaydet()">
-                <input type="number" class="in-gu w-16 p-2 rounded text-sm text-center" placeholder="Gün" value="${gu}" onchange="hafizayaKaydet()">
-                ${isGider && !taksitId ? `<button onclick="taksitlendirButonlu('${rId}')" class="bg-sky-600 hover:bg-sky-500 px-2 py-2 rounded text-xs font-bold transition">Taksitlendir</button>` : ''}
-                ${taksitId ? `<span class="bg-slate-700 text-slate-400 text-[10px] px-2 py-1 rounded select-none font-semibold">Taksitli</span>` : ''}
-                <button onclick="document.getElementById('${rId}').remove(); hafizayaKaydet();" class="text-rose-400 hover:text-rose-300 font-bold px-2 text-sm">✕</button>
-            `;
-            container.appendChild(div);
-        }
+  <div class="card rounded-xl p-6 mb-6">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-lg font-bold text-rose-400">💸 Aylık Giderler</h2>
+      <button onclick="satirEkle('gider-listesi')" class="bg-rose-600 hover:bg-rose-500 text-xs px-3 py-1.5 rounded-lg font-bold transition">+ Gider Ekle</button>
+    </div>
+    <div id="gider-listesi" class="space-y-2"></div>
+  </div>
 
-        function hafizayaKaydet() {
-            const dk = defDonemKodu();
-            const data = { gelirler: [], giderler: [] };
-            document.querySelectorAll('#gelir-listesi > div').forEach(row => {
-                const ad = row.querySelector('.in-ad').value.trim();
-                const tu = row.querySelector('.in-tu').value.trim();
-                const gu = row.querySelector('.in-gu').value.trim();
-                if(ad || tu) data.gelirler.push({ ad, tu, gu });
-            });
-            document.querySelectorAll('#gider-listesi > div').forEach(row => {
-                const ad = row.querySelector('.in-ad').value.trim();
-                const tu = row.querySelector('.in-tu').value.trim();
-                const gu = row.querySelector('.in-gu').value.trim();
-                const od = row.querySelector('.in-od') ? row.querySelector('.in-od').checked : false;
-                const hasTaksitSpan = row.innerHTML.includes('Taksitli');
-                const tId = hasTaksitSpan ? 'tks_existing' : ''; 
-                if(ad || tu) data.giderler.push({ ad, tu, gu, od, taksitId: tId });
-            });
-            localStorage.setItem(dk, JSON.stringify(data));
-            raporHesapla();
-        }
+  <div class="card rounded-xl p-4 flex flex-wrap items-center justify-between gap-3 border-dashed border-sky-500/50">
+    <p class="text-sm text-slate-300">Ek yedek: verilerini dosya olarak da indirebilirsin.</p>
+    <div class="flex gap-2">
+      <button onclick="yedekIndir()" class="bg-sky-600 hover:bg-sky-500 px-3 py-1.5 rounded-lg text-xs font-bold">📥 Yedekle</button>
+      <button onclick="document.getElementById('file-input').click()" class="bg-amber-600 hover:bg-amber-500 px-3 py-1.5 rounded-lg text-xs font-bold">📤 Geri yükle</button>
+      <input type="file" id="file-input" onchange="yedekYukle(event)" class="hidden" accept=".json">
+    </div>
+  </div>
+</div>
 
-        function taksitlendirButonlu(id) {
-            const r = document.getElementById(id);
-            const ad = r.querySelector('.in-ad').value.trim();
-            const tu = r.querySelector('.in-tu').value.trim();
-            const gu = r.querySelector('.in-gu').value.trim();
-            if (!ad || !tu) { alert("⚠️ Lütfen önce harcamanın Açıklama ve Tutar alanlarını doldurun!"); return; }
-            if (confirm(`"${ad}" harcamasını taksitlendirmek istiyor musunuz?`)) {
-                const n = parseInt(prompt("Kaç taksit yapmak istersiniz?"));
-                if (isNaN(n) || n <= 1) return;
-                const yeniTaksitGrupId = "tks_" + Date.now();
-                const sy = parseInt(document.getElementById('y-sel').value);
-                const sm = parseInt(document.getElementById('m-sel').value);
-                for (let i = 0; i < n; i++) {
-                    let m = sm + i; let y = sy;
-                    if (m > 11) { y += Math.floor(m / 12); m = m % 12; }
-                    const dk = `${y}_${m}`;
-                    const ta = `${ad} (${i + 1}/${n})`;
-                    let donemVerisi = JSON.parse(localStorage.getItem(dk)) || { gelirler: [], giderler: [] };
-                    if (i === 0) donemVerisi.giderler = donemVerisi.giderler.filter(x => x.ad.trim() !== ad);
-                    if (!donemVerisi.giderler.some(x => x.ad === ta)) {
-                        donemVerisi.giderler.push({ ad: ta, tu: tu, gu: gu, od: false, taksitId: yeniTaksitGrupId });
-                    }
-                    localStorage.setItem(dk, JSON.stringify(donemVerisi));
-                }
-                alert(`✅ Taksit grubu başarıyla oluşturuldu ve ${n} aya işlendi.`);
-                verileriYukle();
-            }
-        }
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {getAuth,GoogleAuthProvider,signInWithPopup,onAuthStateChanged,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {initializeFirestore,persistentLocalCache,doc,getDoc,setDoc,getDocs,collection,writeBatch} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-        function raporHesapla() {
-            let tGelir = 0, tGider = 0, tKalan = 0;
-            document.querySelectorAll('#gelir-listesi > div').forEach(row => { tGelir += parseFloat(row.querySelector('.in-tu').value) || 0; });
-            document.querySelectorAll('#gider-listesi > div').forEach(row => {
-                const tu = parseFloat(row.querySelector('.in-tu').value) || 0;
-                const od = row.querySelector('.in-od').checked;
-                tGider += tu; if (!od) tKalan += tu;
-            });
-            const net = tGelir - tGider;
-            const netElement = document.getElementById('net-durum');
-            document.getElementById('top-gelir').innerText = tGelir.toLocaleString('tr-TR') + " TL";
-            document.getElementById('top-gider').innerText = tGider.toLocaleString('tr-TR') + " TL";
-            document.getElementById('odenecek-kalan').innerText = tKalan.toLocaleString('tr-TR') + " TL";
-            netElement.innerText = (net >= 0 ? "+" : "") + net.toLocaleString('tr-TR') + " TL";
-            netElement.className = `text-xl font-bold ${net >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
-        }
+// >>> BURAYA Firebase'den kopyaladığın ayarları yapıştır <<<
+const firebaseConfig = {
+  apiKey: "BURAYA",
+  authDomain: "BURAYA",
+  projectId: "BURAYA",
+  storageBucket: "BURAYA",
+  messagingSenderId: "BURAYA",
+  appId: "BURAYA"
+};
 
-        function oncekiAyıKopyala() {
-            const sy = parseInt(document.getElementById('y-sel').value);
-            const sm = parseInt(document.getElementById('m-sel').value);
-            let om = sm - 1, oy = sy; if (om < 0) { om = 11; oy -= 1; }
-            const oldKodu = `${oy}_${om}`;
-            const oldData = JSON.parse(localStorage.getItem(oldKodu));
-            if (!oldData) { alert("⚠️ Önceki aya ait kopyalanacak veri bulunamadı!"); return; }
-            if (confirm("Önceki ayın harcama şablonunu bu aya kopyalamak istiyor musunuz?")) {
-                const newData = { gelirler: [], giderler: [] };
-                oldData.gelirler.forEach(x => newData.gelirler.push({ ad: x.ad, tu: x.tu, gu: x.gu }));
-                oldData.giderler.forEach(x => { if(!x.taksitId) newData.giderler.push({ ad: x.ad, tu: x.tu, gu: x.gu, od: false, taksitId: '' }); });
-                localStorage.setItem(defDonemKodu(), JSON.stringify(newData));
-                verileriYukle();
-            }
-        }
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = initializeFirestore(app, {localCache: persistentLocalCache()});
+let uid = null;
+const $ = id => document.getElementById(id);
+const ref = k => doc(db, 'users', uid, 'months', k);
+const donem = () => `${$('y-sel').value}_${$('m-sel').value}`;
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-        // --- YEDEKLEME SİSTEMİ FONKSİYONLARI ---
-        function yedekIndir() {
-            const tümVeriler = {};
-            for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                if (key.includes('_')) { // Sadece dönem kodlu verileri filtrele (Örn: 2026_5)
-                    tümVeriler[key] = JSON.parse(localStorage.getItem(key));
-                }
-            }
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(tümVeriler, null, 2));
-            const downloadAnchor = document.createElement('a');
-            downloadAnchor.setAttribute("href", dataStr);
-            downloadAnchor.setAttribute("download", `butce_yedek_${new Date().toISOString().slice(0,10)}.json`);
-            document.body.appendChild(downloadAnchor);
-            downloadAnchor.click();
-            downloadAnchor.remove();
-        }
+// Yıl listesi: geçen yıl, bu yıl, 3 yıl sonrasına kadar
+const buYil = new Date().getFullYear();
+for (let y = buYil - 1; y <= buYil + 3; y++) $('y-sel').add(new Option(y, y, false, y === buYil));
+$('m-sel').value = new Date().getMonth();
 
-        function yedekYukle(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    const yuklenenVeri = JSON.parse(e.target.result);
-                    if (confirm("Bu yedeği yüklerseniz tarayıcıdaki mevcut tüm bütçe verileriniz silinecektir. Onaylıyor musunuz?")) {
-                        localStorage.clear(); // Temizle
-                        for (const key in yuklenenVeri) {
-                            localStorage.setItem(key, JSON.stringify(yuklenenVeri[key]));
-                        }
-                        alert("✅ Tüm yedekler başarıyla tarayıcıya geri yüklendi!");
-                        verileriYukle();
-                    }
-                } catch (err) {
-                    alert("⚠️ Geçersiz yedek dosyası!");
-                }
-            };
-            reader.readAsText(file);
-        }
-    </script>
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+
+// ---- Giriş / çıkış ----
+window.girisYap = async () => {
+  try { await signInWithPopup(auth, new GoogleAuthProvider()); }
+  catch (e) { $('login-hata').textContent = 'Giriş yapılamadı: ' + e.code; }
+};
+window.cikisYap = () => signOut(auth);
+
+onAuthStateChanged(auth, async user => {
+  uid = user ? user.uid : null;
+  $('login').classList.toggle('hidden', !!user);
+  $('app').classList.toggle('hidden', !user);
+  if (user) {
+    $('kullanici').textContent = user.email;
+    await eskiVeriyiTasi();
+    yukle();
+  }
+});
+
+// ---- Eski localStorage verisini buluta taşı (bir kez) ----
+async function eskiVeriyiTasi() {
+  const keys = Object.keys(localStorage).filter(k => /^\d{4}_\d{1,2}$/.test(k));
+  if (!keys.length || localStorage.getItem('tasindi_' + uid)) return;
+  if (!confirm(`Bu cihazda ${keys.length} aylık eski veri bulundu. Hesabına aktarılsın mı?`)) return;
+  try {
+    const b = writeBatch(db);
+    keys.forEach(k => b.set(ref(k), JSON.parse(localStorage.getItem(k))));
+    await b.commit();
+    localStorage.setItem('tasindi_' + uid, '1');
+    alert('✅ Eski verilerin hesabına aktarıldı.');
+  } catch (e) { alert('⚠️ Aktarım başarısız: ' + e.message); }
+}
+
+// ---- Veri yükle / kaydet ----
+const bos = () => ({gelirler: [], giderler: []});
+async function ayGetir(k) { const s = await getDoc(ref(k)); return s.exists() ? s.data() : bos(); }
+
+window.yukle = async () => {
+  const d = await ayGetir(donem());
+  $('gelir-listesi').innerHTML = ''; $('gider-listesi').innerHTML = '';
+  d.gelirler.forEach(x => satirEkle('gelir-listesi', x, false));
+  d.giderler.forEach(x => satirEkle('gider-listesi', x, false));
+  rapor();
+};
+
+window.satirEkle = (hedef, o = {}, kaydet = true) => {
+  const isGider = hedef === 'gider-listesi';
+  const div = document.createElement('div');
+  div.className = 'flex flex-wrap items-center gap-2 bg-slate-800 p-2 rounded-lg border border-slate-700';
+  div.dataset.tid = o.taksitId || '';
+  div.innerHTML = `
+    ${isGider ? `<input type="checkbox" class="in-od w-5 h-5 accent-rose-500" ${o.od ? 'checked' : ''}>` : ''}
+    <input type="text" class="in-ad flex-1 p-2 rounded text-sm min-w-[150px]" placeholder="Açıklama" value="${esc(o.ad)}">
+    <input type="number" inputmode="decimal" class="in-tu w-24 p-2 rounded text-sm text-right" placeholder="Tutar" value="${esc(o.tu)}">
+    <input type="number" inputmode="numeric" class="in-gu w-16 p-2 rounded text-sm text-center" placeholder="Gün" value="${esc(o.gu)}">
+    ${isGider && !o.taksitId ? `<button class="bt-tk bg-sky-600 hover:bg-sky-500 px-2 py-2 rounded text-xs font-bold">Taksitlendir</button>` : ''}
+    ${o.taksitId ? `<span class="bg-slate-700 text-slate-400 text-[10px] px-2 py-1 rounded font-semibold">Taksitli</span>` : ''}
+    <button class="bt-sil text-rose-400 hover:text-rose-300 font-bold px-2 text-sm">✕</button>`;
+  div.querySelectorAll('input').forEach(i => i.addEventListener('change', kaydet_));
+  div.querySelector('.bt-sil').onclick = () => { div.remove(); kaydet_(); };
+  const tk = div.querySelector('.bt-tk'); if (tk) tk.onclick = () => taksitlendir(div);
+  $(hedef).appendChild(div);
+  if (kaydet) div.querySelector('.in-ad').focus();
+};
+
+function satirlariOku(listId) {
+  return [...$(listId).children].map(r => {
+    const o = {ad: r.querySelector('.in-ad').value.trim(), tu: r.querySelector('.in-tu').value.trim(), gu: r.querySelector('.in-gu').value.trim()};
+    if (listId === 'gider-listesi') { o.od = r.querySelector('.in-od').checked; o.taksitId = r.dataset.tid || ''; }
+    return o;
+  }).filter(o => o.ad || o.tu);
+}
+
+async function kaydet_() {
+  const dk = donem();
+  rapor();
+  try { await setDoc(ref(dk), {gelirler: satirlariOku('gelir-listesi'), giderler: satirlariOku('gider-listesi')}); }
+  catch (e) { alert('⚠️ Kaydedilemedi: ' + e.message); }
+}
+
+// ---- Taksit ----
+async function taksitlendir(row) {
+  const ad = row.querySelector('.in-ad').value.trim(), tu = row.querySelector('.in-tu').value.trim(), gu = row.querySelector('.in-gu').value.trim();
+  if (!ad || !tu) return alert('⚠️ Önce açıklama ve tutar gir.');
+  const n = parseInt(prompt(`"${ad}" kaç taksit olsun?`));
+  if (isNaN(n) || n <= 1) return;
+  const gid = 'tks_' + Date.now();
+  const sy = +$('y-sel').value, sm = +$('m-sel').value;
+  const b = writeBatch(db);
+  for (let i = 0; i < n; i++) {
+    const t = sm + i, y = sy + Math.floor(t / 12), m = t % 12, dk = `${y}_${m}`;
+    const d = i === 0 ? {gelirler: satirlariOku('gelir-listesi'), giderler: satirlariOku('gider-listesi').filter(x => x.ad !== ad)} : await ayGetir(dk);
+    d.giderler.push({ad: `${ad} (${i + 1}/${n})`, tu, gu, od: false, taksitId: gid});
+    b.set(ref(dk), d);
+  }
+  try { await b.commit(); alert(`✅ ${n} aya taksit işlendi.`); } catch (e) { alert('⚠️ ' + e.message); }
+  yukle();
+}
+
+// ---- Rapor ----
+function rapor() {
+  let g = 0, gi = 0, k = 0;
+  [...$('gelir-listesi').children].forEach(r => g += parseFloat(r.querySelector('.in-tu').value) || 0);
+  [...$('gider-listesi').children].forEach(r => {
+    const t = parseFloat(r.querySelector('.in-tu').value) || 0;
+    gi += t; if (!r.querySelector('.in-od').checked) k += t;
+  });
+  const net = g - gi, f = n => n.toLocaleString('tr-TR') + ' TL';
+  $('top-gelir').textContent = f(g); $('top-gider').textContent = f(gi); $('odenecek-kalan').textContent = f(k);
+  $('net-durum').textContent = (net >= 0 ? '+' : '') + f(net);
+  $('net-durum').className = 'text-xl font-bold ' + (net >= 0 ? 'text-emerald-400' : 'text-rose-400');
+}
+
+window.oncekiAyiKopyala = async () => {
+  let m = +$('m-sel').value - 1, y = +$('y-sel').value;
+  if (m < 0) { m = 11; y--; }
+  const s = await getDoc(ref(`${y}_${m}`));
+  if (!s.exists()) return alert('⚠️ Önceki aya ait veri yok.');
+  if (!confirm('Önceki ayın şablonu bu aya kopyalansın mı? (Bu aydaki mevcut veriler değişir)')) return;
+  const o = s.data();
+  await setDoc(ref(donem()), {
+    gelirler: o.gelirler.map(x => ({ad: x.ad, tu: x.tu, gu: x.gu})),
+    giderler: o.giderler.filter(x => !x.taksitId).map(x => ({ad: x.ad, tu: x.tu, gu: x.gu, od: false, taksitId: ''}))
+  });
+  yukle();
+};
+
+// ---- Yedek ----
+window.yedekIndir = async () => {
+  const snap = await getDocs(collection(db, 'users', uid, 'months')), all = {};
+  snap.forEach(d => all[d.id] = d.data());
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(all, null, 2)], {type: 'application/json'}));
+  a.download = `butce_yedek_${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+};
+
+window.yedekYukle = e => {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = async () => {
+    try {
+      const v = JSON.parse(r.result);
+      if (!confirm('Yedekteki aylar hesabına yazılacak (aynı aylar üzerine yazılır). Onaylıyor musun?')) return;
+      const b = writeBatch(db);
+      Object.keys(v).filter(k => /^\d{4}_\d{1,2}$/.test(k)).forEach(k => b.set(ref(k), v[k]));
+      await b.commit(); alert('✅ Yedek yüklendi.'); yukle();
+    } catch (err) { alert('⚠️ Geçersiz yedek dosyası.'); }
+  };
+  r.readAsText(f);
+};
+</script>
 </body>
 </html>
