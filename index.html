@@ -49,6 +49,7 @@ input:focus,select:focus{outline:none;border-color:#38bdf8}
       </select>
       <select id="y-sel" onchange="yukle()" class="p-2 rounded-lg font-semibold"></select>
       <button onclick="oncekiAyiKopyala()" class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-lg text-sm font-semibold transition">Önceki Ayı Kopyala</button>
+      <button id="geri-al" onclick="geriAl()" disabled class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-lg text-sm font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed">↩ Geri al</button>
       <button onclick="sifreBelirle()" class="text-slate-400 hover:text-white text-xs px-2">🔑 Şifre belirle</button>
       <button onclick="cikisYap()" class="text-slate-400 hover:text-white text-sm px-2">Çıkış</button>
     </div>
@@ -166,6 +167,7 @@ onAuthStateChanged(auth, async user => {
   if (user) {
     $('kullanici').textContent = user.email;
     await eskiVeriyiTasi();
+    gecmis = [];
     await tumunuYukle();
     yukle();
   }
@@ -233,6 +235,7 @@ async function kaydet_() {
   const dk = donem();
   const veri = {gelirler: satirlariOku('gelir-listesi'), giderler: satirlariOku('gider-listesi')};
   rapor();
+  if (sj(tum[dk] || bos()) !== sj(veri)) snapAl();
   tum[dk] = veri; uyariCiz();
   try { await setDoc(ref(dk), veri); }
   catch (e) { alert('⚠️ Kaydedilemedi: ' + e.message); }
@@ -256,6 +259,7 @@ async function taksitlendir(row) {
     d.giderler.push({ad: `${ad} (${k + i}/${n})`, tu, gu, od: false, taksitId: gid});
     b.set(ref(dk), d);
   }
+  snapAl();
   try { await b.commit(); alert(`✅ ${AYLAR[sm]} ${sy} (${k}/${n}) dahil ${kalan} aya taksit işlendi.`); } catch (e) { alert('⚠️ ' + e.message); }
   await tumunuYukle();
   yukle();
@@ -280,12 +284,12 @@ function uyariCiz() {
   const n = new Date(), by = n.getFullYear(), bm = n.getMonth(), bg = n.getDate(), l = [];
   Object.entries(tum).forEach(([k, d]) => {
     const [y, m] = k.split('_').map(Number);
-    (d.giderler || []).forEach(x => {
+    (d.giderler || []).forEach((x, i) => {
       if (x.od) return;
       const gun = parseInt(x.gu) || 0;
       const gecmis = y < by || (y === by && m < bm);
       if (gecmis || (y === by && m === bm && gun && gun < bg))
-        l.push({y, m, gun, ad: x.ad, tu: parseFloat(x.tu) || 0});
+        l.push({k, i, y, m, gun, ad: x.ad, tu: parseFloat(x.tu) || 0});
     });
   });
   l.sort((a, b) => a.y - b.y || a.m - b.m || a.gun - b.gun);
@@ -293,10 +297,40 @@ function uyariCiz() {
   const toplam = l.reduce((t, x) => t + x.tu, 0).toLocaleString('tr-TR');
   $('uyari').innerHTML = `<div class="rounded-xl p-4 mb-6 border border-rose-500/60 bg-rose-950/40">
     <p class="font-bold text-rose-300 mb-2">⚠️ ${l.length} gecikmiş ödemen var — toplam ${toplam} TL</p>
-    <ul class="text-sm space-y-1">${l.slice(0, 10).map(x => `<li><button class="text-left hover:text-sky-300" onclick="git(${x.y},${x.m})">${esc(x.ad || 'İsimsiz')} — ${x.gun ? x.gun + ' ' : ''}${AYLAR[x.m]} ${x.y} · ${x.tu.toLocaleString('tr-TR')} TL</button></li>`).join('')}</ul>
+    <ul class="text-sm space-y-1">${l.slice(0, 10).map(x => `<li class="flex items-center justify-between gap-2"><button class="text-left hover:text-sky-300" onclick="git(${x.y},${x.m})">${esc(x.ad || 'İsimsiz')} — ${x.gun ? x.gun + ' ' : ''}${AYLAR[x.m]} ${x.y} · ${x.tu.toLocaleString('tr-TR')} TL</button><button class="bg-emerald-700 hover:bg-emerald-600 text-xs px-2 py-1 rounded font-bold shrink-0" onclick="odendi('${x.k}',${x.i})">✓ Ödendi</button></li>`).join('')}</ul>
     ${l.length > 10 ? `<p class="text-xs text-slate-400 mt-2">+${l.length - 10} ödeme daha</p>` : ''}
-    <p class="text-xs text-slate-400 mt-2">Ödediysen o ayda kutuyu işaretle, uyarı kaybolur. Satıra basarak o aya gidebilirsin.</p></div>`;
+    <p class="text-xs text-slate-400 mt-2">Ödediysen ✓ Ödendi'ye bas. Satırın kendisine basarak o aya gidebilirsin.</p></div>`;
 }
+// ---- Geri al ----
+let gecmis = [];
+const sj = o => JSON.stringify(o, (k, v) => v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)) : v);
+function butonGuncelle() { const b = $('geri-al'); if (b) b.disabled = !gecmis.length; }
+function snapAl() { gecmis.push(JSON.stringify(tum)); if (gecmis.length > 30) gecmis.shift(); butonGuncelle(); }
+window.geriAl = async () => {
+  if (!gecmis.length) return;
+  const onceki = JSON.parse(gecmis.pop());
+  const b = writeBatch(db); let n = 0;
+  Object.keys({...tum, ...onceki}).forEach(k => {
+    if (sj(tum[k]) === sj(onceki[k])) return;
+    if (onceki[k]) b.set(ref(k), onceki[k]); else b.delete(ref(k));
+    n++;
+  });
+  try { if (n) await b.commit(); }
+  catch (e) { gecmis.push(JSON.stringify(onceki)); butonGuncelle(); return alert('⚠️ Geri alınamadı: ' + e.message); }
+  tum = onceki; uyariCiz(); butonGuncelle();
+  await yukle();
+};
+
+window.odendi = async (k, i) => {
+  const d = tum[k];
+  if (!d || !d.giderler[i]) return;
+  snapAl();
+  d.giderler[i].od = true;
+  try { await setDoc(ref(k), d); } catch (e) { alert('⚠️ Kaydedilemedi: ' + e.message); }
+  uyariCiz();
+  if (k === donem()) yukle();
+};
+
 window.git = (y, m) => {
   if (![...$('y-sel').options].some(o => +o.value === y)) $('y-sel').add(new Option(y, y));
   $('y-sel').value = y; $('m-sel').value = m; yukle();
@@ -349,6 +383,7 @@ window.oncekiAyiKopyala = async () => {
   const ekle = (hedef, kaynak) => { const v = new Set(hedef.map(adi)); kaynak.forEach(x => { if (!v.has(adi(x))) hedef.push(x); }); return hedef; };
   const gelirler = ekle(mevcut.gelirler || [], (o.gelirler || []).map(x => ({ad: x.ad, tu: x.tu, gu: x.gu})));
   const giderler = ekle(mevcut.giderler || [], (o.giderler || []).filter(x => !x.taksitId).map(x => ({ad: x.ad, tu: x.tu, gu: x.gu, od: false, taksitId: ''})));
+  snapAl();
   await setDoc(ref(donem()), {gelirler, giderler});
   await tumunuYukle();
   yukle();
@@ -373,7 +408,7 @@ window.yedekYukle = e => {
       if (!confirm('Yedekteki aylar hesabına yazılacak (aynı aylar üzerine yazılır). Onaylıyor musun?')) return;
       const b = writeBatch(db);
       Object.keys(v).filter(k => /^\d{4}_\d{1,2}$/.test(k)).forEach(k => b.set(ref(k), v[k]));
-      await b.commit(); alert('✅ Yedek yüklendi.'); await tumunuYukle(); yukle();
+      snapAl(); await b.commit(); alert('✅ Yedek yüklendi.'); await tumunuYukle(); yukle();
     } catch (err) { alert('⚠️ Geçersiz yedek dosyası.'); }
   };
   r.readAsText(f);
