@@ -114,7 +114,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt
 
 // Yıl listesi: geçen yıl, bu yıl, 3 yıl sonrasına kadar
 const buYil = new Date().getFullYear();
-for (let y = buYil - 1; y <= buYil + 3; y++) $('y-sel').add(new Option(y, y, false, y === buYil));
+for (let y = buYil - 1; y <= buYil + 10; y++) $('y-sel').add(new Option(y, y, false, y === buYil));
 $('m-sel').value = new Date().getMonth();
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
@@ -215,7 +215,7 @@ window.satirEkle = (hedef, o = {}, kaydet = true) => {
     if (isGider && i.classList.contains('in-gu')) sirala();
     kaydet_();
   }));
-  div.querySelector('.bt-sil').onclick = () => { div.remove(); kaydet_(); };
+  div.querySelector('.bt-sil').onclick = () => { if (div.dataset.tid) taksitSil(div); else { div.remove(); kaydet_(); } };
   const tk = div.querySelector('.bt-tk'); if (tk) tk.onclick = () => taksitlendir(div);
   $(hedef).appendChild(div);
   if (kaydet) div.querySelector('.in-ad').focus();
@@ -242,18 +242,21 @@ async function kaydet_() {
 async function taksitlendir(row) {
   const ad = row.querySelector('.in-ad').value.trim(), tu = row.querySelector('.in-tu').value.trim(), gu = row.querySelector('.in-gu').value.trim();
   if (!ad || !tu) return alert('⚠️ Önce açıklama ve tutar gir.');
-  const n = parseInt(prompt(`"${ad}" kaç taksit olsun?`));
-  if (isNaN(n) || n <= 1) return;
-  const gid = 'tks_' + Date.now();
   const sy = +$('y-sel').value, sm = +$('m-sel').value;
+  const n = parseInt(prompt(`"${ad}" toplam kaç taksit?`));
+  if (isNaN(n) || n < 2 || n > 120) return alert('⚠️ Taksit sayısı 2 ile 120 arasında olmalı.');
+  const k = parseInt(prompt(`Bu ay (${AYLAR[sm]} ${sy}) ödenecek taksit kaçıncı taksit? (1 - ${n})`, '1'));
+  if (isNaN(k) || k < 1 || k > n) return alert(`⚠️ 1 ile ${n} arasında bir sayı gir.`);
+  const kalan = n - k + 1; // geçmiş taksitler yazılmaz, sadece bu aydan itibaren kalanlar
+  const gid = 'tks_' + Date.now();
   const b = writeBatch(db);
-  for (let i = 0; i < n; i++) {
+  for (let i = 0; i < kalan; i++) {
     const t = sm + i, y = sy + Math.floor(t / 12), m = t % 12, dk = `${y}_${m}`;
     const d = i === 0 ? {gelirler: satirlariOku('gelir-listesi'), giderler: satirlariOku('gider-listesi').filter(x => x.ad !== ad)} : await ayGetir(dk);
-    d.giderler.push({ad: `${ad} (${i + 1}/${n})`, tu, gu, od: false, taksitId: gid});
+    d.giderler.push({ad: `${ad} (${k + i}/${n})`, tu, gu, od: false, taksitId: gid});
     b.set(ref(dk), d);
   }
-  try { await b.commit(); alert(`✅ ${n} aya taksit işlendi.`); } catch (e) { alert('⚠️ ' + e.message); }
+  try { await b.commit(); alert(`✅ ${AYLAR[sm]} ${sy} (${k}/${n}) dahil ${kalan} aya taksit işlendi.`); } catch (e) { alert('⚠️ ' + e.message); }
   await tumunuYukle();
   yukle();
 }
@@ -298,6 +301,28 @@ window.git = (y, m) => {
   if (![...$('y-sel').options].some(o => +o.value === y)) $('y-sel').add(new Option(y, y));
   $('y-sel').value = y; $('m-sel').value = m; yukle();
 };
+
+// ---- Taksit silme ----
+async function taksitSil(row) {
+  const tid = row.dataset.tid, ad = row.querySelector('.in-ad').value;
+  const c = (prompt(`"${ad}" taksitli bir gider.\n\n1 = Sadece bu ayı sil\n2 = Bu ay ve sonraki tüm aylardan sil\n3 = Tüm aylardan sil (geçmiş aylar dahil)\n\nSeçimin (1, 2 veya 3):`) || '').trim();
+  if (!['1', '2', '3'].includes(c)) return;
+  const dk = donem(), [cy, cm] = dk.split('_').map(Number);
+  row.remove();
+  await kaydet_();
+  if (c === '1') return;
+  const b = writeBatch(db); let sayi = 0;
+  Object.entries(tum).forEach(([k, d]) => {
+    if (k === dk) return;
+    const [y, m] = k.split('_').map(Number);
+    if (c === '2' && (y < cy || (y === cy && m < cm))) return;
+    const yeni = (d.giderler || []).filter(x => x.taksitId !== tid);
+    if (yeni.length !== (d.giderler || []).length) { b.set(ref(k), {...d, giderler: yeni}); sayi++; }
+  });
+  try { if (sayi) await b.commit(); } catch (e) { alert('⚠️ Silinemedi: ' + e.message); }
+  await tumunuYukle();
+  alert(`✅ Taksit ${sayi + 1} aydan silindi.`);
+}
 
 // ---- Rapor ----
 function rapor() {
